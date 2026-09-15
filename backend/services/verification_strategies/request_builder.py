@@ -5,7 +5,7 @@ from backend.services.request_engine import RequestSpec
 
 def build_injected_request(candidate: dict, new_payload: str) -> Optional[RequestSpec]:
     affected_url = candidate.get("affected_url")
-    affected_param = candidate.get("affected_param")
+    affected_param = candidate.get("affected_param") or candidate.get("location")
     proof_request = candidate.get("proof_request", "")
     
     if not affected_url or not affected_param or not proof_request:

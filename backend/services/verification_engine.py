@@ -556,11 +556,25 @@ class GenericReproducibilityStrategy(BaseVerificationStrategy):
             )
 
         # 2. Execute verification request via RequestEngine
-        spec = RequestSpec(
-            url=affected_url,
-            method="GET",
-            timeout=RequestTimeout(connect=5.0, read=10.0, total=15.0),
-        )
+        import sys
+        from pathlib import Path
+        sys.path.append(str(Path(__file__).parent.parent.parent))
+        try:
+            from backend.services.verification_strategies.request_builder import build_injected_request
+            spec = build_injected_request(candidate, payload)
+        except Exception as e:
+            print(f"Exception in build_injected_request: {e}")
+            spec = None
+            
+        if not spec:
+            print(f"build_injected_request returned None! candidate: {candidate}, payload: {payload}")
+            spec = RequestSpec(
+                url=affected_url,
+                method="GET",
+                timeout=RequestTimeout(connect=5.0, read=10.0, total=15.0),
+            )
+        else:
+            spec.timeout = RequestTimeout(connect=5.0, read=10.0, total=15.0)
         try:
             resp_evidence = await context.send_verification_request(spec)
         except BudgetExceededError as be:

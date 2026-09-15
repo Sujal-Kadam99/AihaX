@@ -31,7 +31,7 @@ class SqlInjectionVerificationStrategy(BaseVerificationStrategy):
         candidate = context.candidate_evidence
         
         # 1. Baseline Request
-        spec_baseline = build_injected_request(candidate, candidate.get("payload", ""))
+        spec_baseline = build_injected_request(candidate, "1")
         if not spec_baseline:
             ev_id = context.record_evidence(
                 evidence_type="missing_evidence",
