@@ -102,5 +102,58 @@ def parse_xml():
         return jsonify({"error": f"XML parse error: {e}"}), 400
 
 
+# 6. Directory Listing (Vulnerable by design: returns Apache-style listing)
+@app.route('/files/')
+def directory_listing():
+    listing = """<html><head><title>Index of /files/</title></head>
+<body><h1>Index of /files/</h1>
+<pre><a href="?C=N;O=D">Name</a>  <a href="?C=M;O=A">Last modified</a>  <a href="?C=S;O=A">Size</a>
+<hr>
+<a href="../">Parent Directory</a>    -
+<a href=".env">.env</a>              2026-09-01 10:00   1.2K
+<a href="config.json">config.json</a>       2026-09-01 10:00   3.4K
+<a href="backup.sql">backup.sql</a>        2026-09-01 10:00   45M
+<a href="logo.png">logo.png</a>          2026-09-01 10:00   128K
+<hr></pre></body></html>"""
+    return listing, 200
+
+
+# 7. Verbose Error / Stack Trace Leak (Vulnerable by design: debug mode on)
+@app.route('/error-page')
+def error_page():
+    # Simulate a Python traceback leak
+    probe = request.args.get('aihax_error_probe[]', request.args.get('id', None))
+    if probe:
+        traceback_output = """Traceback (most recent call last):
+  File "/home/deploy/app/main.py", line 42, in handler
+    result = db.query(user_id=probe)
+  File "/home/deploy/app/database.py", line 98, in query
+    cursor.execute(sql, params)
+psycopg2.errors.SyntaxError: syntax error at or near "'"
+LINE 1: SELECT * FROM users WHERE id = '''
+                                        ^"""
+        return f"<html><body><h1>Internal Server Error</h1><pre>{traceback_output}</pre></body></html>", 500
+    return "<html><body>OK</body></html>", 200
+
+
+# 8. Default Credentials Login (Vulnerable by design: accepts admin/admin)
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'GET':
+        return '<html><body><form method="POST"><input name="username"/><input name="password" type="password"/><button>Login</button></form></body></html>'
+    
+    username = request.form.get('username', '')
+    password = request.form.get('password', '')
+    
+    # Vulnerable: accepts default credentials
+    if username == 'admin' and password in ('admin', 'password', '123456'):
+        resp = make_response('<html><body>Welcome to your Dashboard! <a href="/logout">Logout</a></body></html>')
+        resp.set_cookie('session', 'authenticated_admin_session_abc123', path='/')
+        return resp
+    
+    return '<html><body>Login failed. Invalid username or password. <form method="POST"><input name="username"/><input name="password" type="password"/><button>Login</button></form></body></html>', 200
+
+
 if __name__ == '__main__':
     app.run(port=5005)
+

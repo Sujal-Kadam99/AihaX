@@ -1781,6 +1781,9 @@ from backend.services.verification_strategies.cors_strategy import CorsVerificat
 from backend.services.verification_strategies.jwt_strategy import JwtVerificationStrategy
 from backend.services.verification_strategies.file_upload_strategy import FileUploadVerificationStrategy
 from backend.services.verification_strategies.xxe_strategy import XxeVerificationStrategy
+from backend.services.verification_strategies.directory_listing_strategy import DirectoryListingVerificationStrategy
+from backend.services.verification_strategies.verbose_error_strategy import VerboseErrorVerificationStrategy
+from backend.services.verification_strategies.default_credentials_strategy import DefaultCredentialsVerificationStrategy
 
 VerificationRegistry.register(SqlInjectionVerificationStrategy)
 VerificationRegistry.register(BlindSqlInjectionVerificationStrategy)
@@ -1791,6 +1794,9 @@ VerificationRegistry.register(CorsVerificationStrategy)
 VerificationRegistry.register(JwtVerificationStrategy)
 VerificationRegistry.register(FileUploadVerificationStrategy)
 VerificationRegistry.register(XxeVerificationStrategy)
+VerificationRegistry.register(DirectoryListingVerificationStrategy)
+VerificationRegistry.register(VerboseErrorVerificationStrategy)
+VerificationRegistry.register(DefaultCredentialsVerificationStrategy)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
