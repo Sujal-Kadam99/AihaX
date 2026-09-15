@@ -1780,9 +1780,11 @@ VerificationRegistry.register(SubdomainTakeoverStrategy)
 from backend.services.verification_strategies.sql_injection_strategy import SqlInjectionVerificationStrategy
 from backend.services.verification_strategies.blind_sql_injection_strategy import BlindSqlInjectionVerificationStrategy
 from backend.services.verification_strategies.command_injection_strategy import CommandInjectionVerificationStrategy
+from backend.services.verification_strategies.open_redirect_strategy import OpenRedirectVerificationStrategy
 VerificationRegistry.register(SqlInjectionVerificationStrategy)
 VerificationRegistry.register(BlindSqlInjectionVerificationStrategy)
 VerificationRegistry.register(CommandInjectionVerificationStrategy)
+VerificationRegistry.register(OpenRedirectVerificationStrategy)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

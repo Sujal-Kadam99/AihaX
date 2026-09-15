@@ -51,14 +51,25 @@ def build_injected_request(candidate: dict, new_payload: str) -> Optional[Reques
         new_url = urllib.parse.urlunparse(parsed._replace(query=new_query))
         return RequestSpec(url=new_url, method=method, headers=headers, body=body)
         
-    # 2. Check if param is in JSON body
+    # 2. Check if param is in JSON body (by content type or just shape)
     content_type = headers.get("Content-Type", "").lower()
-    if body and "application/json" in content_type:
+    if body and ("application/json" in content_type or body.strip().startswith("{")):
         try:
             data = json.loads(body)
             if affected_param in data:
-                data[affected_param] = new_payload
-                return RequestSpec(url=affected_url, method=method, headers=headers, body=json.dumps(data))
+                try:
+                    parsed_payload = json.loads(new_payload)
+                except json.JSONDecodeError:
+                    parsed_payload = new_payload
+                data[affected_param] = parsed_payload
+                
+                new_headers = dict(headers)
+                if "Content-Type" in new_headers and "application/json" not in new_headers["Content-Type"].lower():
+                    new_headers["Content-Type"] = "application/json"
+                elif "content-type" in new_headers and "application/json" not in new_headers["content-type"].lower():
+                    new_headers["content-type"] = "application/json"
+                
+                return RequestSpec(url=affected_url, method=method, headers=new_headers, body=json.dumps(data))
         except json.JSONDecodeError:
             pass
             
