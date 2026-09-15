@@ -93,7 +93,7 @@ async def test_hypothesis(engine, hyp, cookies):
         scan_id="scan-123",
         agent_id=1,
         title=f"{hyp.check_id} Detected",
-        vuln_type=hyp.vulnerability_id,
+        vuln_type=hyp.check_id,
         category="Injection",
         severity="High",
         confidence=90,

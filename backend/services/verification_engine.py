@@ -408,8 +408,8 @@ class VerificationRegistry:
         "Authentication Rate-Limit Weakness": "auth_rate_limit",
         "C024_Blind_SQL_Injection": "generic_reproducibility",
         "C025_NoSQL_Injection": "generic_reproducibility",
-        "C026_Command_Injection_Indicators": "generic_reproducibility",
-        "C027_OS_Command_Injection": "generic_reproducibility",
+        "C026_Command_Injection_Indicators": "C026_OS_Command_Injection",
+        "C027_OS_Command_Injection": "C026_OS_Command_Injection",
         "C028_SSTI": "generic_reproducibility",
         "C029_Header_Injection": "http_response_property",
         "C030_CRLF_Injection": "http_response_property",
@@ -1779,8 +1779,10 @@ VerificationRegistry.register(OpenRedirectStrategy)
 VerificationRegistry.register(SubdomainTakeoverStrategy)
 from backend.services.verification_strategies.sql_injection_strategy import SqlInjectionVerificationStrategy
 from backend.services.verification_strategies.blind_sql_injection_strategy import BlindSqlInjectionVerificationStrategy
+from backend.services.verification_strategies.command_injection_strategy import CommandInjectionVerificationStrategy
 VerificationRegistry.register(SqlInjectionVerificationStrategy)
 VerificationRegistry.register(BlindSqlInjectionVerificationStrategy)
+VerificationRegistry.register(CommandInjectionVerificationStrategy)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
