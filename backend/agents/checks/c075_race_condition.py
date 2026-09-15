@@ -44,6 +44,10 @@ class C075RaceCondition(BaseCheck):
         target_url: str,
         config: Dict[str, Any],
     ) -> Optional[CheckResult]:
+        permit_testing = config.get("permit_race_condition_testing", False)
+        if not permit_testing:
+            return None
+
         # Send 3 concurrent requests simultaneously using asyncio.gather
         specs = [
             RequestSpec(
@@ -73,7 +77,7 @@ class C075RaceCondition(BaseCheck):
                 candidate_reason="3 simultaneous parallel state-modifying requests all succeeded with HTTP 200/201 without concurrency locking.",
                 request_ids=req_ids,
                 evidence_ids=ev_ids,
-                observed_data={"concurrent_success_count": 3},
+                observed_data={"concurrent_success_count": 3, "permit_race_condition_testing": permit_testing},
                 payload="3x Parallel POST Request",
                 proof_response="3 concurrent identical requests executed with status 200/201",
                 confidence=75,

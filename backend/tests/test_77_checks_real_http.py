@@ -515,7 +515,7 @@ async def test_real_http_c070_mass_assignment(live_server: str, real_request_eng
 async def test_real_http_c075_race_condition(live_server: str, real_request_engine: RequestEngine):
     """Special Case: C075 concurrent parallel requests demonstrate lack of locking."""
     check = registry.get_check("C075_Race_Condition")()
-    result = await check.execute(real_request_engine, f"{live_server}/vulnerable/c075_race_condition", {})
+    result = await check.execute(real_request_engine, f"{live_server}/vulnerable/c075_race_condition", {"permit_race_condition_testing": True})
     assert result is not None
     assert result.check_id == "C075_Race_Condition"
     assert result.observed_data.get("concurrent_success_count") == 3

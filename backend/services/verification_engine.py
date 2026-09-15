@@ -1784,6 +1784,9 @@ from backend.services.verification_strategies.xxe_strategy import XxeVerificatio
 from backend.services.verification_strategies.directory_listing_strategy import DirectoryListingVerificationStrategy
 from backend.services.verification_strategies.verbose_error_strategy import VerboseErrorVerificationStrategy
 from backend.services.verification_strategies.default_credentials_strategy import DefaultCredentialsVerificationStrategy
+from backend.services.verification_strategies.mass_assignment_strategy import MassAssignmentVerificationStrategy
+from backend.services.verification_strategies.parameter_tampering_strategy import ParameterTamperingVerificationStrategy
+from backend.services.verification_strategies.race_condition_strategy import RaceConditionVerificationStrategy
 
 VerificationRegistry.register(SqlInjectionVerificationStrategy)
 VerificationRegistry.register(BlindSqlInjectionVerificationStrategy)
@@ -1797,6 +1800,9 @@ VerificationRegistry.register(XxeVerificationStrategy)
 VerificationRegistry.register(DirectoryListingVerificationStrategy)
 VerificationRegistry.register(VerboseErrorVerificationStrategy)
 VerificationRegistry.register(DefaultCredentialsVerificationStrategy)
+VerificationRegistry.register(MassAssignmentVerificationStrategy)
+VerificationRegistry.register(ParameterTamperingVerificationStrategy)
+VerificationRegistry.register(RaceConditionVerificationStrategy)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
