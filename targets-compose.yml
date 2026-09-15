@@ -1,0 +1,7 @@
+version: '3'
+services:
+  juice-shop:
+    image: bkimminich/juice-shop
+    ports:
+      - "3001:3000"
+    restart: unless-stopped

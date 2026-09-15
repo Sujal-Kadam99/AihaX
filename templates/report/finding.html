@@ -1,0 +1,7 @@
+<h3>{{ finding.title }}</h3>
+<p><strong>Severity:</strong> {{ finding.severity }}</p>
+<p><strong>URL:</strong> {{ finding.affected_url }}</p>
+{% if finding.payload %}
+<p><strong>Proof of Concept:</strong></p>
+<pre><code>{{ finding.payload }}</code></pre>
+{% endif %}

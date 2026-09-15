@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AihaX Penetration Test Report — {{ target_url }}</title>
+    <style>
+        @page { size: A4; margin: 2cm 2.2cm; }
+        @page :first { margin-top: 0; }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #1a1a2e;
+            font-size: 10.5pt;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ─── COVER PAGE ─── */
+        .cover {
+            background: linear-gradient(160deg, #0d0d1a 0%, #0a1628 60%, #0d1a0d 100%);
+            color: #fff;
+            min-height: 29.7cm;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            page-break-after: always;
+            padding: 3cm 2cm;
+        }
+        .cover-logo { font-size: 52pt; font-weight: 900; letter-spacing: -2px; color: #00D4FF; margin-bottom: 4px; }
+        .cover-logo span { color: #00ff88; }
+        .cover-tagline { font-size: 13pt; color: #7ec8e3; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 60px; }
+        .cover-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-weight: bold;
+            font-size: 9pt;
+            padding: 6px 18px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+        }
+        .cover-divider { width: 60px; height: 3px; background: #00D4FF; margin: 0 auto 40px; }
+        .cover-meta { color: #b0c4de; font-size: 11pt; line-height: 2; }
+        .cover-meta strong { color: #e0e8f0; }
+        .cover-footer { margin-top: 80px; font-size: 8.5pt; color: #445566; }
+
+        /* ─── RISK SCORE ─── */
+        .risk-block {
+            margin: 30px 0;
+            padding: 20px;
+            border-left: 5px solid #00D4FF;
+            background: #f0f8ff;
+        }
+        .risk-score-num {
+            font-size: 40pt;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .risk-critical { color: #cc0000; }
+        .risk-high { color: #e65c00; }
+        .risk-medium { color: #b8860b; }
+        .risk-low { color: #1a7a1a; }
+        .risk-clean { color: #2266cc; }
+
+        /* ─── TYPOGRAPHY ─── */
+        h1 { font-size: 20pt; color: #0a1628; border-bottom: 2px solid #00D4FF; padding-bottom: 6px; margin-top: 36px; margin-bottom: 14px; }
+        h2 { font-size: 14pt; color: #1a3a5c; margin-top: 28px; margin-bottom: 10px; }
+        h3 { font-size: 11pt; color: #1a3a5c; margin: 0 0 6px; }
+        p { margin: 6px 0; }
+
+        /* ─── SUMMARY TABLE ─── */
+        .summary-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .summary-table th, .summary-table td { border: 1px solid #d0d8e8; padding: 9px 12px; text-align: left; }
+        .summary-table th { background: #1a3a5c; color: #fff; font-size: 9.5pt; text-transform: uppercase; letter-spacing: 0.5px; }
+        .summary-table tr:nth-child(even) { background: #f7f9fc; }
+
+        /* ─── SEVERITY COLOURS ─── */
+        .sev-critical { color: #cc0000; font-weight: bold; }
+        .sev-high     { color: #e65c00; font-weight: bold; }
+        .sev-medium   { color: #b8860b; font-weight: bold; }
+        .sev-low      { color: #1a7a1a; }
+        .sev-info     { color: #2266cc; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 3px;
+            font-size: 8.5pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-critical { background: #cc0000; color: #fff; }
+        .badge-high     { background: #e65c00; color: #fff; }
+        .badge-medium   { background: #e3b341; color: #333; }
+        .badge-low      { background: #3fb950; color: #fff; }
+        .badge-info     { background: #2266cc; color: #fff; }
+
+        /* ─── FINDING CARD ─── */
+        .finding {
+            border: 1px solid #d0d8e8;
+            border-left: 4px solid #ccc;
+            padding: 16px 18px;
+            margin: 18px 0;
+            page-break-inside: avoid;
+            border-radius: 0 4px 4px 0;
+        }
+        .finding.critical { border-left-color: #cc0000; background: #fff9f9; }
+        .finding.high     { border-left-color: #e65c00; background: #fff8f5; }
+        .finding.medium   { border-left-color: #e3b341; background: #fffdf0; }
+        .finding.low      { border-left-color: #3fb950; background: #f5fff8; }
+        .finding.info     { border-left-color: #2266cc; background: #f5f8ff; }
+
+        .finding-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .finding-title { font-size: 12pt; font-weight: bold; color: #0a1628; flex: 1; margin-right: 12px; }
+        .finding-meta { font-size: 9pt; color: #556; margin: 3px 0; }
+
+        code {
+            background: #f0f0f5;
+            border: 1px solid #dde;
+            padding: 1px 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 9pt;
+            border-radius: 2px;
+            word-break: break-all;
+        }
+        .code-block {
+            background: #1a1a2e;
+            color: #e0e8ff;
+            border-radius: 4px;
+            padding: 10px 14px;
+            font-family: 'Courier New', monospace;
+            font-size: 8.5pt;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 8px 0;
+        }
+
+        /* ─── REMEDIATION / IMPACT SECTIONS ─── */
+        .section-box {
+            margin-top: 10px;
+            padding: 12px 14px;
+            border-radius: 4px;
+            font-size: 9.5pt;
+        }
+        .remediation-box { background: #f0fff4; border: 1px solid #b7eac8; }
+        .impact-box      { background: #fff8f0; border: 1px solid #fad4a0; }
+        .section-box h4  { margin: 0 0 5px; font-size: 9.5pt; color: #333; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* ─── EXPLOIT CHAIN ─── */
+        .chain-card { border: 1px solid #d0d8e8; padding: 14px 16px; margin: 14px 0; background: #f8faff; }
+        .chain-steps { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: 9pt; }
+        .chain-step { background: #1a3a5c; color: #fff; padding: 3px 10px; border-radius: 3px; }
+        .chain-arrow { color: #99aabb; font-weight: bold; }
+
+        /* ─── VERDICT PILL ─── */
+        .verdict { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 8pt; font-weight: bold; }
+        .verdict-verified   { background: #ffd0d0; color: #880000; }
+        .verdict-potential  { background: #ffe8cc; color: #884400; }
+        .verdict-inconclusive { background: #e8e8e8; color: #444; }
+
+        /* ─── SCREENSHOT EVIDENCE ─── */
+        .screenshot-block {
+            margin-top: 14px;
+            border: 1px solid #d0d8e8;
+            border-radius: 4px;
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+        .screenshot-header {
+            background: #1a3a5c;
+            color: #fff;
+            padding: 6px 12px;
+            font-size: 8.5pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .screenshot-block img {
+            width: 100%;
+            display: block;
+            border-bottom: 1px solid #d0d8e8;
+        }
+        .screenshot-caption {
+            background: #f7f9ff;
+            padding: 10px 14px;
+            font-size: 8.5pt;
+            color: #334;
+            line-height: 1.5;
+            font-style: italic;
+            border-top: 1px solid #d0d8e8;
+        }
+
+        /* ─── FOOTER ─── */
+        .page-footer { text-align: center; color: #99aabb; font-size: 8pt; margin-top: 60px; border-top: 1px solid #dde; padding-top: 10px; }
+
+        /* ─── PAGE BREAK HELPERS ─── */
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ COVER PAGE ═══════════════ -->
+<div class="cover">
+    <div class="cover-logo">Aiha<span>X</span></div>
+    <div class="cover-tagline">AI-Powered Penetration Test Report</div>
+
+    {% if admin_mode %}
+    <div class="cover-badge">★ Premium Admin Audit Mode ★</div>
+    {% endif %}
+
+    <div class="cover-divider"></div>
+
+    <div class="cover-meta">
+        <p><strong>Target:</strong> {{ target_url }}</p>
+        <p><strong>Scan Mode:</strong> {{ scan_mode | capitalize }} / {{ scan_depth | capitalize }} depth</p>
+        {% if industry and industry != 'General' %}<p><strong>Industry:</strong> {{ industry }}</p>{% endif %}
+        <p><strong>Scan Started:</strong> {{ created_at }}</p>
+        <p><strong>Scan Completed:</strong> {{ completed_at }}</p>
+        <p><strong>Total Findings:</strong> {{ total_findings }}</p>
+        <p><strong>Scan ID:</strong> <span style="font-family:monospace; font-size:9pt;">{{ scan_id }}</span></p>
+    </div>
+
+    <div class="cover-footer">
+        Generated by AihaX v1.0 &nbsp;|&nbsp; {{ generated_at }} &nbsp;|&nbsp; Confidential — Not for distribution
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ EXECUTIVE SUMMARY ═══════ -->
+{% if report_mode in ['executive', 'full'] or not report_mode %}
+<h1>Executive Summary</h1>
+
+{% if admin_mode %}
+<div style="background:#1a1a2e; color:#FFD700; border-left:4px solid #FFD700; padding:14px 18px; margin:14px 0; font-family:monospace; font-size:9.5pt; line-height:1.5; border-radius:0 4px 4px 0;">
+    <strong style="color:#fff;">[AUDIT GRADE — ADMIN MODE]</strong><br>
+    Full deep-pipeline testing with 20 threads, WAF bypass active, and zero rate limiting. Results represent maximum-fidelity findings with minimal false positive risk.
+</div>
+{% endif %}
+
+<p>
+    This report presents the findings from an automated penetration test conducted by <strong>AihaX</strong>
+    against <strong>{{ target_url }}</strong>.
+    A total of <strong>{{ total_findings }}</strong> verified vulnerabilities were identified across the assessment.
+</p>
+
+<!-- Risk Score -->
+{% set risk = risk_score | int %}
+<div class="risk-block">
+    <p style="margin:0 0 4px; font-size:9pt; text-transform:uppercase; letter-spacing:1px; color:#556;">Overall Risk Score</p>
+    <div class="risk-score-num {% if risk >= 70 %}risk-critical{% elif risk >= 40 %}risk-high{% elif risk >= 20 %}risk-medium{% elif risk > 0 %}risk-low{% else %}risk-clean{% endif %}">
+        {{ risk }}<span style="font-size:16pt; color:#99aabb;">/100</span>
+    </div>
+</div>
+
+<!-- Severity Summary -->
+<table class="summary-table">
+    <tr>
+        <th>Severity</th>
+        <th>Count</th>
+        <th>Description</th>
+    </tr>
+    <tr><td class="sev-critical">🔴 Critical</td><td><strong>{{ severity_counts.critical }}</strong></td><td>Immediate exploitation risk — fix within 24 hours</td></tr>
+    <tr><td class="sev-high">🟠 High</td><td><strong>{{ severity_counts.high }}</strong></td><td>High exploitation potential — fix within 1 week</td></tr>
+    <tr><td class="sev-medium">🟡 Medium</td><td><strong>{{ severity_counts.medium }}</strong></td><td>Moderate risk — fix within 1 month</td></tr>
+    <tr><td class="sev-low">🟢 Low</td><td><strong>{{ severity_counts.low }}</strong></td><td>Limited impact — fix at next release cycle</td></tr>
+    <tr><td class="sev-info">🔵 Info</td><td><strong>{{ severity_counts.info }}</strong></td><td>Informational / hardening recommendations</td></tr>
+</table>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════ EXPLOIT CHAINS ═══════════ -->
+{% if exploit_chains and (report_mode in ['executive', 'full'] or not report_mode) %}
+<h1 class="page-break">Exploit Chain Analysis</h1>
+<p>The following multi-stage attack paths were identified by combining individual vulnerabilities. These chains represent amplified risk beyond individual findings.</p>
+
+{% for chain in exploit_chains %}
+<div class="chain-card">
+    <div class="finding-header">
+        <h3>{{ chain.chain_name }}</h3>
+        <span class="badge badge-{{ chain.severity_final }}">{{ chain.severity_final }}</span>
+    </div>
+    <p class="finding-meta">{{ chain.impact_summary }}</p>
+    {% if chain.steps %}
+    <div class="chain-steps">
+        {% for step in chain.steps %}
+        <span class="chain-step">{{ step }}</span>
+        {% if not loop.last %}<span class="chain-arrow">→</span>{% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- ═══════════════════════════════════════════ BUG BOUNTY REPORTS ════════ -->
+{% if report_mode in ['bugbounty', 'bug_bounty', 'full'] or not report_mode %}
+<h1 class="page-break">Detailed Vulnerability Reports</h1>
+<p>The following technical reports provide evidence-backed analysis for all verified vulnerabilities, formatted for immediate engineering action and Bug Bounty submission.</p>
+
+{% if bug_bounty_findings %}
+{% for finding in bug_bounty_findings %}
+<div class="finding {{ finding.severity|lower }}">
+    <div class="finding-header">
+        <div class="finding-title">Finding #{{ loop.index }}: {{ finding.title }}</div>
+        <div>
+            <span class="badge badge-{{ finding.severity|lower }}">{{ finding.severity }}</span>
+            &nbsp;
+            <span class="verdict verdict-verified">Verified</span>
+        </div>
+    </div>
+
+    <table class="summary-table" style="margin-top: 10px;">
+        <tr><th width="30%">Target</th><td><code>{{ finding.target }}</code></td></tr>
+        <tr><th>Affected URL</th><td><a href="{{ finding.affected_url }}">{{ finding.affected_url }}</a></td></tr>
+        <tr><th>Vulnerability Type</th><td>{{ finding.vulnerability_type }}</td></tr>
+        {% if finding.cwe %}<tr><th>CWE</th><td>{{ finding.cwe }}</td></tr>{% endif %}
+        {% if finding.owasp_category %}<tr><th>OWASP Category</th><td>{{ finding.owasp_category }}</td></tr>{% endif %}
+        <tr><th>Confidence</th><td>{{ finding.confidence }}%</td></tr>
+    </table>
+
+    <h2 style="font-size: 11pt; border-bottom: 1px solid #d0d8e8; padding-bottom: 4px; margin-top: 16px;">SUMMARY</h2>
+    <p>{{ finding.summary }}</p>
+
+    <h2 style="font-size: 11pt; border-bottom: 1px solid #d0d8e8; padding-bottom: 4px; margin-top: 16px;">STEPS TO REPRODUCE</h2>
+    <div style="padding-left: 10px; margin: 10px 0;">
+        {% for step in finding.steps_to_reproduce %}
+        <p style="margin: 4px 0;">{{ step }}</p>
+        {% endfor %}
+    </div>
+
+    <h2 style="font-size: 11pt; border-bottom: 1px solid #d0d8e8; padding-bottom: 4px; margin-top: 16px;">IMPACT</h2>
+    <div class="section-box impact-box">
+        <h4>Confirmed Impact</h4>
+        <p>{{ finding.impact_confirmed }}</p>
+        
+        <h4 style="margin-top: 10px;">Potential Impact</h4>
+        <p>{{ finding.impact_potential }}</p>
+    </div>
+
+    <h2 style="font-size: 11pt; border-bottom: 1px solid #d0d8e8; padding-bottom: 4px; margin-top: 16px;">PROOF OF CONCEPT</h2>
+    <p><em>{{ finding.proof_of_concept.description }}</em></p>
+
+    {% if finding.proof_of_concept.request and finding.proof_of_concept.request != 'Not available from collected evidence.' %}
+    <p style="margin-top:10px;"><strong>Proof Request:</strong></p>
+    <pre class="code-block">{{ finding.proof_of_concept.request | e }}</pre>
+    {% endif %}
+
+    {% if finding.proof_of_concept.payload and finding.proof_of_concept.payload != 'Not available from collected evidence.' %}
+    <p style="margin-top:10px;"><strong>Attack Payload:</strong></p>
+    <pre class="code-block">{{ finding.proof_of_concept.payload | e }}</pre>
+    {% endif %}
+
+    {% if finding.proof_of_concept.response and finding.proof_of_concept.response != 'Not available from collected evidence.' %}
+    <p style="margin-top:10px;"><strong>Server Response Evidence:</strong></p>
+    <pre class="code-block">{{ finding.proof_of_concept.response[:1000] | e }}{% if finding.proof_of_concept.response|length > 1000 %}…{% endif %}</pre>
+    {% endif %}
+
+    <h2 style="font-size: 11pt; border-bottom: 1px solid #d0d8e8; padding-bottom: 4px; margin-top: 16px;">SUGGESTED FIX</h2>
+    <div class="section-box remediation-box">
+        <p>{{ finding.suggested_fix }}</p>
+    </div>
+
+    {% if finding.references %}
+    <h2 style="font-size: 11pt; border-bottom: 1px solid #d0d8e8; padding-bottom: 4px; margin-top: 16px;">REFERENCES</h2>
+    <ul style="margin: 6px 0; padding-left: 20px; font-size: 9.5pt;">
+        {% for ref in finding.references %}
+        <li><a href="{{ ref }}">{{ ref }}</a></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<p>No verified vulnerabilities were found during this assessment. The target application passed all executed security checks.</p>
+{% endif %}
+{% endif %}
+
+<!-- ═══════════════════════════════════════════ FOOTER ══════════════════ -->
+<div class="page-footer">
+    AihaX v1.0 &nbsp;|&nbsp; AI-Powered Automated Penetration Testing &nbsp;|&nbsp; {{ generated_at }} &nbsp;|&nbsp; CONFIDENTIAL
+</div>
+
+</body>
+</html>

@@ -1,0 +1,78 @@
+:root,
+.dark {
+  /* Surface & Background Tokens */
+  --color-bg-app: #090d12;
+  --color-bg-surface: #161b22;
+  --color-bg-surface-elevated: #21262d;
+  --color-bg-surface-hover: #262c36;
+
+  /* Border Tokens */
+  --color-border-subtle: #21262d;
+  --color-border-default: #30363d;
+  --color-border-strong: #484f58;
+
+  /* Text Tokens */
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #8b949e;
+  --color-text-muted: #484f58;
+
+  /* Brand Accent Tokens */
+  --color-brand-accent: #00d4ff;
+  --color-brand-accent-hover: #33ddff;
+  --color-brand-accent-glow: rgba(0, 212, 255, 0.25);
+
+  /* Security Severity Tokens - Dark Mode */
+  --color-critical: #ff4444;
+  --color-critical-bg: rgba(255, 68, 68, 0.15);
+  --color-high: #ff8c00;
+  --color-high-bg: rgba(255, 140, 0, 0.15);
+  --color-medium: #e3b341;
+  --color-medium-bg: rgba(227, 179, 65, 0.15);
+  --color-low: #3fb950;
+  --color-low-bg: rgba(63, 185, 80, 0.15);
+  --color-info: #58a6ff;
+  --color-info-bg: rgba(88, 166, 255, 0.15);
+  --color-warning: #d29922;
+  --color-warning-bg: rgba(210, 153, 34, 0.15);
+  --color-success: #238636;
+  --color-success-bg: rgba(35, 134, 54, 0.15);
+}
+
+.light {
+  /* Surface & Background Tokens */
+  --color-bg-app: #f6f8fa;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-elevated: #f3f4f6;
+  --color-bg-surface-hover: #e5e7eb;
+
+  /* Border Tokens */
+  --color-border-subtle: #e5e7eb;
+  --color-border-default: #d0d7de;
+  --color-border-strong: #8c959f;
+
+  /* Text Tokens */
+  --color-text-primary: #1f2328;
+  --color-text-secondary: #656d76;
+  --color-text-muted: #8c959f;
+
+  /* Brand Accent Tokens */
+  --color-brand-accent: #0969da;
+  --color-brand-accent-hover: #0854b0;
+  --color-brand-accent-glow: rgba(9, 105, 218, 0.15);
+
+  /* Security Severity Tokens - Light Mode */
+  --color-critical: #cf222e;
+  --color-critical-bg: rgba(207, 34, 46, 0.1);
+  --color-high: #bc4c00;
+  --color-high-bg: rgba(188, 76, 0, 0.1);
+  --color-medium: #9a6700;
+  --color-medium-bg: rgba(154, 103, 0, 0.1);
+  --color-low: #1a7f37;
+  --color-low-bg: rgba(26, 127, 55, 0.1);
+  --color-info: #0969da;
+  --color-info-bg: rgba(9, 105, 218, 0.1);
+  --color-warning: #9a6700;
+  --color-warning-bg: rgba(154, 103, 0, 0.1);
+  --color-success: #1a7f37;
+  --color-success-bg: rgba(26, 127, 55, 0.1);
+}

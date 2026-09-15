@@ -1,0 +1,1556 @@
+F401 [*] `json` imported but unused
+ --> backend\agents\auth_agent.py:3:8
+  |
+1 | """Agent 2 â€” Authentication: Playwright-based login and 2FA handling."""
+2 |
+3 | import json
+  |        ^^^^
+4 | from typing import Any
+  |
+help: Remove unused import: `json`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\agents\base_agent.py:3:1
+   |
+ 1 |   """Base agent class for the AihaX 9-agent pipeline."""
+ 2 |
+ 3 | / import json
+ 4 | | import traceback
+ 5 | | from abc import ABC, abstractmethod
+ 6 | | from datetime import datetime
+ 7 | | from typing import Any, Optional
+ 8 | |
+ 9 | | from sqlalchemy.orm import Session
+10 | |
+11 | | from backend.core.redis_client import (
+12 | |     get_scan_status,
+13 | |     publish_update,
+14 | |     set_agent_state,
+15 | | )
+16 | | from backend.models.database import AgentLog
+   | |____________________________________________^
+   |
+help: Organize imports
+
+F401 [*] `json` imported but unused
+ --> backend\agents\base_agent.py:3:8
+  |
+1 | """Base agent class for the AihaX 9-agent pipeline."""
+2 |
+3 | import json
+  |        ^^^^
+4 | import traceback
+5 | from abc import ABC, abstractmethod
+  |
+help: Remove unused import: `json`
+
+F401 [*] `datetime.datetime` imported but unused
+ --> backend\agents\base_agent.py:6:22
+  |
+4 | import traceback
+5 | from abc import ABC, abstractmethod
+6 | from datetime import datetime
+  |                      ^^^^^^^^
+7 | from typing import Any, Optional
+  |
+help: Remove unused import: `datetime.datetime`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\agents\base_agent.py:58:18
+   |
+56 |         progress: int,
+57 |         message: str,
+58 |         finding: Optional[dict[str, Any]] = None,
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+59 |     ) -> None:
+60 |         await set_agent_state(self.scan_id, self.agent_id, status, progress, message)
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\agents\base_agent.py:75:21
+   |
+73 |         level: str,
+74 |         message: str,
+75 |         raw_output: Optional[str] = None,
+   |                     ^^^^^^^^^^^^^
+76 |     ) -> None:
+77 |         entry = AgentLog(
+   |
+help: Convert to `X | None`
+
+F401 [*] `json` imported but unused
+ --> backend\agents\bugbounty_agent.py:3:8
+  |
+1 | """Agent 9 â€” Bug Bounty Export: HackerOne/Bugcrowd format reports and PoC packages."""
+2 |
+3 | import json
+  |        ^^^^
+4 | import zipfile
+5 | from pathlib import Path
+  |
+help: Remove unused import: `json`
+
+E501 Line too long (104 > 100)
+  --> backend\agents\bugbounty_agent.py:37:101
+   |
+35 |                 from jinja2 import Environment, FileSystemLoader
+36 |
+37 |                 template_dir = Path(__file__).resolve().parent.parent.parent / "templates" / "bugbounty"
+   |                                                                                                     ^^^^
+38 |                 env = Environment(loader=FileSystemLoader(str(template_dir)))
+39 |                 h1_template = env.get_template("hackerone.html")
+   |
+
+E501 Line too long (107 > 100)
+  --> backend\agents\bugbounty_agent.py:56:101
+   |
+54 |                         zf.writestr("response.txt", finding.proof_response)
+55 |
+56 |                 exports.append({"finding_id": finding.id, "hackerone": str(h1_path), "poc": str(poc_path)})
+   |                                                                                                     ^^^^^^^
+57 |             except Exception as e:
+58 |                 self.log("warning", f"Bug bounty export failed for {finding.title}: {e}")
+   |
+
+F401 [*] `backend.models.database.Scan` imported but unused
+ --> backend\agents\exploit_chain_agent.py:9:60
+  |
+7 | from backend.agents.base_agent import BaseAgent
+8 | from backend.core.config import get_settings
+9 | from backend.models.database import ExploitChain, Finding, Scan
+  |                                                            ^^^^
+  |
+help: Remove unused import: `backend.models.database.Scan`
+
+F841 Local variable `settings` is assigned to but never used
+  --> backend\agents\exploit_chain_agent.py:16:9
+   |
+15 |     async def execute(self) -> dict[str, Any]:
+16 |         settings = get_settings()
+   |         ^^^^^^^^
+17 |         findings = (
+18 |             self.db.query(Finding)
+   |
+help: Remove assignment to unused variable `settings`
+
+E501 Line too long (111 > 100)
+  --> backend\agents\exploit_chain_agent.py:79:101
+   |
+77 |                 "Single-step Exploit",
+78 |                 [f.title for f in findings[:3]],
+79 |                 "No multi-stage exploit path was identified, but the confirmed findings still represent risk.",
+   |                                                                                                     ^^^^^^^^^^^
+80 |                 max((f.severity for f in findings), key=self._severity_rank),
+81 |             ))
+   |
+
+E501 Line too long (105 > 100)
+  --> backend\agents\exploit_chain_agent.py:85:101
+   |
+83 |         return chains
+84 |
+85 |     def _chain_template(self, name: str, steps: list[str], impact: str, severity: str) -> dict[str, Any]:
+   |                                                                                                     ^^^^^
+86 |         return {"name": name, "steps": steps, "impact": impact, "severity": severity}
+   |
+
+E501 Line too long (113 > 100)
+  --> backend\agents\impact_agent.py:27:101
+   |
+26 |         if not api_key:
+27 |             await self.publish_update("running", 100, "Claude API key not configured â€” skipping business impact")
+   |                                                                                                     ^^^^^^^^^^^^^
+28 |             return {"skipped": True, "reason": "no_api_key"}
+   |
+
+E501 Line too long (108 > 100)
+  --> backend\agents\impact_agent.py:37:101
+   |
+35 |             await self.check_cancelled()
+36 |             progress = int((i / max(len(findings), 1)) * 100)
+37 |             await self.publish_update("running", progress, f"Analyzing business impact: {finding.title}...")
+   |                                                                                                     ^^^^^^^^
+38 |
+39 |             try:
+   |
+
+E501 Line too long (104 > 100)
+  --> backend\agents\impact_agent.py:64:101
+   |
+62 |             model=settings.claude_model,
+63 |             max_tokens=1500,
+64 |             system="You translate technical security findings into business-readable risk assessments.",
+   |                                                                                                     ^^^^
+65 |             messages=[{
+66 |                 "role": "user",
+   |
+
+F401 [*] `json` imported but unused
+ --> backend\agents\learning_agent.py:3:8
+  |
+1 | """Agent 5 â€” Learning: upsert confirmed vulns and FP patterns to ChromaDB."""
+2 |
+3 | import json
+  |        ^^^^
+4 | from typing import Any
+  |
+help: Remove unused import: `json`
+
+F401 [*] `subprocess` imported but unused
+ --> backend\agents\recon_agent.py:5:8
+  |
+3 | import asyncio
+4 | import json
+5 | import subprocess
+  |        ^^^^^^^^^^
+6 | from typing import Any
+7 | from urllib.parse import urlparse
+  |
+help: Remove unused import: `subprocess`
+
+E501 Line too long (109 > 100)
+  --> backend\agents\remediation_agent.py:27:101
+   |
+26 |         if not api_key:
+27 |             await self.publish_update("running", 100, "Claude API key not configured â€” skipping remediation")
+   |                                                                                                     ^^^^^^^^^
+28 |             return {"skipped": True, "reason": "no_api_key"}
+   |
+
+E501 Line too long (109 > 100)
+  --> backend\agents\remediation_agent.py:37:101
+   |
+35 |             await self.check_cancelled()
+36 |             progress = int((i / max(len(findings), 1)) * 100)
+37 |             await self.publish_update("running", progress, f"Generating remediation for: {finding.title}...")
+   |                                                                                                     ^^^^^^^^^
+38 |
+39 |             try:
+   |
+
+E501 Line too long (103 > 100)
+  --> backend\agents\remediation_agent.py:64:101
+   |
+62 |             model=settings.claude_model,
+63 |             max_tokens=2000,
+64 |             system="You are a senior security engineer. Generate framework-specific remediation code.",
+   |                                                                                                     ^^^
+65 |             messages=[{
+66 |                 "role": "user",
+   |
+
+F401 [*] `json` imported but unused
+ --> backend\agents\report_agent.py:3:8
+  |
+1 | """Agent 6 â€” Report Generation: WeasyPrint + Jinja2 PDF output."""
+2 |
+3 | import json
+  |        ^^^^
+4 | from datetime import datetime
+5 | from pathlib import Path
+  |
+help: Remove unused import: `json`
+
+E501 Line too long (117 > 100)
+  --> backend\agents\scope_agent.py:20:101
+   |
+18 |                 "error",
+19 |                 0,
+20 |                 "Authorization confirmation is required before scanning. Please confirm you have written permission."
+   |                                                                                                     ^^^^^^^^^^^^^^^^^
+21 |             )
+22 |             raise ValueError(
+   |
+
+E501 Line too long (115 > 100)
+  --> backend\agents\scope_agent.py:30:101
+   |
+28 |                 "error",
+29 |                 0,
+30 |                 "Scope notes are required for authorization. Please provide a description of the authorized scope."
+   |                                                                                                     ^^^^^^^^^^^^^^^
+31 |             )
+32 |             raise ValueError(
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\agents\vuln_agent.py:3:1
+   |
+ 1 |   """Agent 3 â€” Vulnerability Testing: 77 vulnerabilities across 9 categories (MVP-15 subset)."""
+ 2 |
+ 3 | / import asyncio
+ 4 | | import json
+ 5 | | import uuid
+ 6 | | from typing import Any, Optional
+ 7 | |
+ 8 | | from backend.agents.base_agent import BaseAgent
+ 9 | | from backend.core.redis_client import get_attack_surface
+10 | | from backend.models.database import Finding
+   | |___________________________________________^
+   |
+help: Organize imports
+
+F401 [*] `json` imported but unused
+ --> backend\agents\vuln_agent.py:4:8
+  |
+3 | import asyncio
+4 | import json
+  |        ^^^^
+5 | import uuid
+6 | from typing import Any, Optional
+  |
+help: Remove unused import: `json`
+
+E501 Line too long (101 > 100)
+  --> backend\agents\vuln_agent.py:15:101
+   |
+13 | MVP_VULNS = [
+14 |     {"type": "sqli", "title": "SQL Injection", "category": "injection", "severity": "critical"},
+15 |     {"type": "xss_reflected", "title": "Reflected XSS", "category": "injection", "severity": "high"},
+   |                                                                                                     ^
+16 |     {"type": "xss_stored", "title": "Stored XSS", "category": "injection", "severity": "high"},
+17 |     {"type": "idor", "title": "Insecure Direct Object Reference", "category": "access_control", "severity": "high"},
+   |
+
+E501 Line too long (116 > 100)
+  --> backend\agents\vuln_agent.py:17:101
+   |
+15 |     {"type": "xss_reflected", "title": "Reflected XSS", "category": "injection", "severity": "high"},
+16 |     {"type": "xss_stored", "title": "Stored XSS", "category": "injection", "severity": "high"},
+17 |     {"type": "idor", "title": "Insecure Direct Object Reference", "category": "access_control", "severity": "high"},
+   |                                                                                                     ^^^^^^^^^^^^^^^^
+18 |     {"type": "csrf", "title": "Cross-Site Request Forgery", "category": "access_control", "severity": "medium"},
+19 |     {"type": "ssrf", "title": "Server-Side Request Forgery", "category": "ssrf", "severity": "critical"},
+   |
+
+E501 Line too long (112 > 100)
+  --> backend\agents\vuln_agent.py:18:101
+   |
+16 |     {"type": "xss_stored", "title": "Stored XSS", "category": "injection", "severity": "high"},
+17 |     {"type": "idor", "title": "Insecure Direct Object Reference", "category": "access_control", "severity": "high"},
+18 |     {"type": "csrf", "title": "Cross-Site Request Forgery", "category": "access_control", "severity": "medium"},
+   |                                                                                                     ^^^^^^^^^^^^
+19 |     {"type": "ssrf", "title": "Server-Side Request Forgery", "category": "ssrf", "severity": "critical"},
+20 |     {"type": "open_redirect", "title": "Open Redirect", "category": "access_control", "severity": "medium"},
+   |
+
+E501 Line too long (105 > 100)
+  --> backend\agents\vuln_agent.py:19:101
+   |
+17 |     {"type": "idor", "title": "Insecure Direct Object Reference", "category": "access_control", "severity": "high"},
+18 |     {"type": "csrf", "title": "Cross-Site Request Forgery", "category": "access_control", "severity": "medium"},
+19 |     {"type": "ssrf", "title": "Server-Side Request Forgery", "category": "ssrf", "severity": "critical"},
+   |                                                                                                     ^^^^^
+20 |     {"type": "open_redirect", "title": "Open Redirect", "category": "access_control", "severity": "medium"},
+21 |     {"type": "jwt_none", "title": "JWT Algorithm None Attack", "category": "api", "severity": "critical"},
+   |
+
+E501 Line too long (108 > 100)
+  --> backend\agents\vuln_agent.py:20:101
+   |
+18 |     {"type": "csrf", "title": "Cross-Site Request Forgery", "category": "access_control", "severity": "medium"},
+19 |     {"type": "ssrf", "title": "Server-Side Request Forgery", "category": "ssrf", "severity": "critical"},
+20 |     {"type": "open_redirect", "title": "Open Redirect", "category": "access_control", "severity": "medium"},
+   |                                                                                                     ^^^^^^^^
+21 |     {"type": "jwt_none", "title": "JWT Algorithm None Attack", "category": "api", "severity": "critical"},
+22 |     {"type": "broken_auth", "title": "Broken Authentication", "category": "authentication", "severity": "high"},
+   |
+
+E501 Line too long (106 > 100)
+  --> backend\agents\vuln_agent.py:21:101
+   |
+19 |     {"type": "ssrf", "title": "Server-Side Request Forgery", "category": "ssrf", "severity": "critical"},
+20 |     {"type": "open_redirect", "title": "Open Redirect", "category": "access_control", "severity": "medium"},
+21 |     {"type": "jwt_none", "title": "JWT Algorithm None Attack", "category": "api", "severity": "critical"},
+   |                                                                                                     ^^^^^^
+22 |     {"type": "broken_auth", "title": "Broken Authentication", "category": "authentication", "severity": "high"},
+23 |     {"type": "sensitive_data", "title": "Sensitive Data Exposure", "category": "data_exposure", "severity": "high"},
+   |
+
+E501 Line too long (112 > 100)
+  --> backend\agents\vuln_agent.py:22:101
+   |
+20 |     {"type": "open_redirect", "title": "Open Redirect", "category": "access_control", "severity": "medium"},
+21 |     {"type": "jwt_none", "title": "JWT Algorithm None Attack", "category": "api", "severity": "critical"},
+22 |     {"type": "broken_auth", "title": "Broken Authentication", "category": "authentication", "severity": "high"},
+   |                                                                                                     ^^^^^^^^^^^^
+23 |     {"type": "sensitive_data", "title": "Sensitive Data Exposure", "category": "data_exposure", "severity": "high"},
+24 |     {"type": "subdomain_takeover", "title": "Subdomain Takeover", "category": "recon", "severity": "high"},
+   |
+
+E501 Line too long (116 > 100)
+  --> backend\agents\vuln_agent.py:23:101
+   |
+21 |     {"type": "jwt_none", "title": "JWT Algorithm None Attack", "category": "api", "severity": "critical"},
+22 |     {"type": "broken_auth", "title": "Broken Authentication", "category": "authentication", "severity": "high"},
+23 |     {"type": "sensitive_data", "title": "Sensitive Data Exposure", "category": "data_exposure", "severity": "high"},
+   |                                                                                                     ^^^^^^^^^^^^^^^^
+24 |     {"type": "subdomain_takeover", "title": "Subdomain Takeover", "category": "recon", "severity": "high"},
+25 |     {"type": "cors", "title": "CORS Misconfiguration", "category": "api", "severity": "medium"},
+   |
+
+E501 Line too long (107 > 100)
+  --> backend\agents\vuln_agent.py:24:101
+   |
+22 |     {"type": "broken_auth", "title": "Broken Authentication", "category": "authentication", "severity": "high"},
+23 |     {"type": "sensitive_data", "title": "Sensitive Data Exposure", "category": "data_exposure", "severity": "high"},
+24 |     {"type": "subdomain_takeover", "title": "Subdomain Takeover", "category": "recon", "severity": "high"},
+   |                                                                                                     ^^^^^^^
+25 |     {"type": "cors", "title": "CORS Misconfiguration", "category": "api", "severity": "medium"},
+26 |     {"type": "clickjacking", "title": "Clickjacking", "category": "access_control", "severity": "medium"},
+   |
+
+E501 Line too long (106 > 100)
+  --> backend\agents\vuln_agent.py:26:101
+   |
+24 |     {"type": "subdomain_takeover", "title": "Subdomain Takeover", "category": "recon", "severity": "high"},
+25 |     {"type": "cors", "title": "CORS Misconfiguration", "category": "api", "severity": "medium"},
+26 |     {"type": "clickjacking", "title": "Clickjacking", "category": "access_control", "severity": "medium"},
+   |                                                                                                     ^^^^^^
+27 |     {"type": "host_header", "title": "Host Header Injection", "category": "injection", "severity": "medium"},
+28 |     {"type": "graphql_introspection", "title": "GraphQL Introspection Enabled", "category": "api", "severity": "medium"},
+   |
+
+E501 Line too long (109 > 100)
+  --> backend\agents\vuln_agent.py:27:101
+   |
+25 |     {"type": "cors", "title": "CORS Misconfiguration", "category": "api", "severity": "medium"},
+26 |     {"type": "clickjacking", "title": "Clickjacking", "category": "access_control", "severity": "medium"},
+27 |     {"type": "host_header", "title": "Host Header Injection", "category": "injection", "severity": "medium"},
+   |                                                                                                     ^^^^^^^^^
+28 |     {"type": "graphql_introspection", "title": "GraphQL Introspection Enabled", "category": "api", "severity": "medium"},
+29 |     {"type": "path_traversal", "title": "Path Traversal", "category": "injection", "severity": "high"},
+   |
+
+E501 Line too long (121 > 100)
+  --> backend\agents\vuln_agent.py:28:101
+   |
+26 |     {"type": "clickjacking", "title": "Clickjacking", "category": "access_control", "severity": "medium"},
+27 |     {"type": "host_header", "title": "Host Header Injection", "category": "injection", "severity": "medium"},
+28 |     {"type": "graphql_introspection", "title": "GraphQL Introspection Enabled", "category": "api", "severity": "medium"},
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^
+29 |     {"type": "path_traversal", "title": "Path Traversal", "category": "injection", "severity": "high"},
+30 |     {"type": "xxe", "title": "XML External Entity (XXE)", "category": "injection", "severity": "high"},
+   |
+
+E501 Line too long (103 > 100)
+  --> backend\agents\vuln_agent.py:29:101
+   |
+27 |     {"type": "host_header", "title": "Host Header Injection", "category": "injection", "severity": "medium"},
+28 |     {"type": "graphql_introspection", "title": "GraphQL Introspection Enabled", "category": "api", "severity": "medium"},
+29 |     {"type": "path_traversal", "title": "Path Traversal", "category": "injection", "severity": "high"},
+   |                                                                                                     ^^^
+30 |     {"type": "xxe", "title": "XML External Entity (XXE)", "category": "injection", "severity": "high"},
+31 |     {"type": "ssti", "title": "Server-Side Template Injection", "category": "injection", "severity": "high"},
+   |
+
+E501 Line too long (103 > 100)
+  --> backend\agents\vuln_agent.py:30:101
+   |
+28 |     {"type": "graphql_introspection", "title": "GraphQL Introspection Enabled", "category": "api", "severity": "medium"},
+29 |     {"type": "path_traversal", "title": "Path Traversal", "category": "injection", "severity": "high"},
+30 |     {"type": "xxe", "title": "XML External Entity (XXE)", "category": "injection", "severity": "high"},
+   |                                                                                                     ^^^
+31 |     {"type": "ssti", "title": "Server-Side Template Injection", "category": "injection", "severity": "high"},
+32 |     {"type": "directory_listing", "title": "Directory Listing", "category": "disclosure", "severity": "medium"},
+   |
+
+E501 Line too long (109 > 100)
+  --> backend\agents\vuln_agent.py:31:101
+   |
+29 |     {"type": "path_traversal", "title": "Path Traversal", "category": "injection", "severity": "high"},
+30 |     {"type": "xxe", "title": "XML External Entity (XXE)", "category": "injection", "severity": "high"},
+31 |     {"type": "ssti", "title": "Server-Side Template Injection", "category": "injection", "severity": "high"},
+   |                                                                                                     ^^^^^^^^^
+32 |     {"type": "directory_listing", "title": "Directory Listing", "category": "disclosure", "severity": "medium"},
+33 |     {"type": "security_headers", "title": "Missing Security Headers", "category": "config", "severity": "low"},
+   |
+
+E501 Line too long (112 > 100)
+  --> backend\agents\vuln_agent.py:32:101
+   |
+30 |     {"type": "xxe", "title": "XML External Entity (XXE)", "category": "injection", "severity": "high"},
+31 |     {"type": "ssti", "title": "Server-Side Template Injection", "category": "injection", "severity": "high"},
+32 |     {"type": "directory_listing", "title": "Directory Listing", "category": "disclosure", "severity": "medium"},
+   |                                                                                                     ^^^^^^^^^^^^
+33 |     {"type": "security_headers", "title": "Missing Security Headers", "category": "config", "severity": "low"},
+34 | ]
+   |
+
+E501 Line too long (111 > 100)
+  --> backend\agents\vuln_agent.py:33:101
+   |
+31 |     {"type": "ssti", "title": "Server-Side Template Injection", "category": "injection", "severity": "high"},
+32 |     {"type": "directory_listing", "title": "Directory Listing", "category": "disclosure", "severity": "medium"},
+33 |     {"type": "security_headers", "title": "Missing Security Headers", "category": "config", "severity": "low"},
+   |                                                                                                     ^^^^^^^^^^^
+34 | ]
+   |
+
+F841 Local variable `threads` is assigned to but never used
+  --> backend\agents\vuln_agent.py:43:9
+   |
+41 |         target_url = self.config.get("target_url", "")
+42 |         attack_surface = await get_attack_surface(self.scan_id) or {}
+43 |         threads = self.config.get("threads", 5)
+   |         ^^^^^^^
+44 |         depth = self.config.get("scan_depth", "normal")
+   |
+help: Remove assignment to unused variable `threads`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\agents\vuln_agent.py:80:10
+   |
+78 |         attack_surface: dict[str, Any],
+79 |         depth: str,
+80 |     ) -> Optional[dict[str, Any]]:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^
+81 |         """Dispatch to appropriate test method."""
+82 |         test_map = {
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:122:57
+    |
+120 |             return ""
+121 |
+122 |     async def _test_sqli(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+123 |         risk = "3" if depth == "deep" else "1"
+124 |         level = "5" if depth == "deep" else "1"
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:133:56
+    |
+131 |         return None
+132 |
+133 |     async def _test_xss(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+134 |         output = await self._run_subprocess([
+135 |             "dalfox", "url", url, "--silence",
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:141:67
+    |
+139 |         return None
+140 |
+141 |     async def _test_sensitive_data(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+142 |         import aiohttp
+143 |         paths = ["/.env", "/.git/config", "/backup", "/.htaccess"]
+    |
+help: Convert to `X | None`
+
+E501 Line too long (120 > 100)
+   --> backend\agents\vuln_agent.py:147:101
+    |
+145 |             for path in paths:
+146 |                 try:
+147 |                     async with session.get(f"{url.rstrip('/')}{path}", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^
+148 |                         if resp.status == 200:
+149 |                             text = await resp.text()
+    |
+
+E501 Line too long (108 > 100)
+   --> backend\agents\vuln_agent.py:150:101
+    |
+148 |                         if resp.status == 200:
+149 |                             text = await resp.text()
+150 |                             if any(kw in text for kw in ["DB_", "SECRET", "PASSWORD", "API_KEY", "[core]"]):
+    |                                                                                                     ^^^^^^^^
+151 |                                 return {"confidence": 90, "payload": path, "affected_url": f"{url}{path}"}
+152 |                 except Exception:
+    |
+
+E501 Line too long (106 > 100)
+   --> backend\agents\vuln_agent.py:151:101
+    |
+149 |                             text = await resp.text()
+150 |                             if any(kw in text for kw in ["DB_", "SECRET", "PASSWORD", "API_KEY", "[core]"]):
+151 |                                 return {"confidence": 90, "payload": path, "affected_url": f"{url}{path}"}
+    |                                                                                                     ^^^^^^
+152 |                 except Exception:
+153 |                     continue
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:156:57
+    |
+154 |         return None
+155 |
+156 |     async def _test_cors(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+157 |         import aiohttp
+158 |         async with aiohttp.ClientSession() as session:
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:172:65
+    |
+170 |         return None
+171 |
+172 |     async def _test_clickjacking(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+173 |         import aiohttp
+174 |         async with aiohttp.ClientSession() as session:
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:185:60
+    |
+183 |         return None
+184 |
+185 |     async def _test_graphql(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                            ^^^^^^^^^^^^^^^^^^^^^^^^
+186 |         import aiohttp
+187 |         graphql_url = f"{url.rstrip('/')}/graphql"
+    |
+help: Convert to `X | None`
+
+E501 Line too long (108 > 100)
+   --> backend\agents\vuln_agent.py:200:101
+    |
+198 |                         text = await resp.text()
+199 |                         if "__schema" in text:
+200 |                             return {"confidence": 85, "payload": introspection, "affected_url": graphql_url}
+    |                                                                                                     ^^^^^^^^
+201 |             except Exception:
+202 |                 pass
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:205:67
+    |
+203 |         return None
+204 |
+205 |     async def _test_path_traversal(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+206 |         import aiohttp
+207 |         payload = "/../../../../etc/passwd"
+    |
+help: Convert to `X | None`
+
+E501 Line too long (119 > 100)
+   --> backend\agents\vuln_agent.py:210:101
+    |
+208 |         async with aiohttp.ClientSession() as session:
+209 |             try:
+210 |                 async with session.get(f"{url.rstrip('/')}{payload}", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^
+211 |                     if resp.status == 200 and "root:" in await resp.text():
+212 |                         return {"confidence": 80, "payload": payload, "affected_url": f"{url}{payload}"}
+    |
+
+E501 Line too long (104 > 100)
+   --> backend\agents\vuln_agent.py:212:101
+    |
+210 |                 async with session.get(f"{url.rstrip('/')}{payload}", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+211 |                     if resp.status == 200 and "root:" in await resp.text():
+212 |                         return {"confidence": 80, "payload": payload, "affected_url": f"{url}{payload}"}
+    |                                                                                                     ^^^^
+213 |             except Exception:
+214 |                 pass
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:217:57
+    |
+215 |         return None
+216 |
+217 |     async def _test_ssti(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+218 |         import aiohttp
+219 |         payload = "{{7*7}}"
+    |
+help: Convert to `X | None`
+
+E501 Line too long (123 > 100)
+   --> backend\agents\vuln_agent.py:222:101
+    |
+220 |         async with aiohttp.ClientSession() as session:
+221 |             try:
+222 |                 async with session.get(f"{url.rstrip('/')}/?q={payload}", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^
+223 |                     text = await resp.text()
+224 |                     if "49" in text:
+    |
+
+E501 Line too long (108 > 100)
+   --> backend\agents\vuln_agent.py:225:101
+    |
+223 |                     text = await resp.text()
+224 |                     if "49" in text:
+225 |                         return {"confidence": 70, "payload": payload, "affected_url": f"{url}/?q={payload}"}
+    |                                                                                                     ^^^^^^^^
+226 |             except Exception:
+227 |                 pass
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:230:56
+    |
+228 |         return None
+229 |
+230 |     async def _test_xxe(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+231 |         import aiohttp
+232 |         xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE foo [ <!ELEMENT foo ANY ><!ENTITY xxe SYSTEM \"file:///etc/passwâ€¦
+    |
+help: Convert to `X | None`
+
+E501 Line too long (159 > 100)
+   --> backend\agents\vuln_agent.py:232:101
+    |
+230 | â€¦dict[str, Any]]:
+231 | â€¦
+232 | â€¦TYPE foo [ <!ELEMENT foo ANY ><!ENTITY xxe SYSTEM \"file:///etc/passwd\" >]>\n<foo>&xxe;</foo>"
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+233 | â€¦
+234 | â€¦
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:248:70
+    |
+246 |         return None
+247 |
+248 |     async def _test_directory_listing(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+249 |         import aiohttp
+250 |         async with aiohttp.ClientSession() as session:
+    |
+help: Convert to `X | None`
+
+E501 Line too long (111 > 100)
+   --> backend\agents\vuln_agent.py:252:101
+    |
+250 |         async with aiohttp.ClientSession() as session:
+251 |             try:
+252 |                 async with session.get(f"{url.rstrip('/')}/", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+    |                                                                                                     ^^^^^^^^^^^
+253 |                     text = await resp.text()
+254 |                     if "Index of /" in text:
+    |
+
+E501 Line too long (113 > 100)
+   --> backend\agents\vuln_agent.py:255:101
+    |
+253 |                     text = await resp.text()
+254 |                     if "Index of /" in text:
+255 |                         return {"confidence": 70, "payload": "Index of /", "affected_url": f"{url.rstrip('/')}/"}
+    |                                                                                                     ^^^^^^^^^^^^^
+256 |             except Exception:
+257 |                 pass
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:260:69
+    |
+258 |         return None
+259 |
+260 |     async def _test_security_headers(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+261 |         import aiohttp
+262 |         async with aiohttp.ClientSession() as session:
+    |
+help: Convert to `X | None`
+
+E501 Line too long (136 > 100)
+   --> backend\agents\vuln_agent.py:266:101
+    |
+264 | â€¦     async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+265 | â€¦         missing = []
+266 | â€¦         for header in ["X-Content-Type-Options", "X-Frame-Options", "Content-Security-Policy", "Strict-Transport-Security"]:
+    |                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+267 | â€¦             if not resp.headers.get(header):
+268 | â€¦                 missing.append(header)
+    |
+
+E501 Line too long (101 > 100)
+   --> backend\agents\vuln_agent.py:270:101
+    |
+268 |                             missing.append(header)
+269 |                     if missing:
+270 |                         return {"confidence": 60, "payload": ", ".join(missing), "affected_url": url}
+    |                                                                                                     ^
+271 |             except Exception:
+272 |                 pass
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:275:57
+    |
+273 |         return None
+274 |
+275 |     async def _test_idor(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+276 |         return None
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:278:57
+    |
+276 |         return None
+277 |
+278 |     async def _test_csrf(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+279 |         return None
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:281:66
+    |
+279 |         return None
+280 |
+281 |     async def _test_open_redirect(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+282 |         import aiohttp
+283 |         async with aiohttp.ClientSession() as session:
+    |
+help: Convert to `X | None`
+
+E501 Line too long (122 > 100)
+   --> backend\agents\vuln_agent.py:286:101
+    |
+284 |             try:
+285 |                 check_url = f"{url.rstrip('/')}?next=https://evil.com"
+286 |                 async with session.get(check_url, allow_redirects=False, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^
+287 |                     if resp.status in (301, 302) and "evil.com" in resp.headers.get("location", ""):
+288 |                         return {"confidence": 65, "payload": check_url, "affected_url": check_url}
+    |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:293:61
+    |
+291 |         return None
+292 |
+293 |     async def _test_jwt_none(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^
+294 |         return None
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:296:64
+    |
+294 |         return None
+295 |
+296 |     async def _test_broken_auth(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
+297 |         return None
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:299:71
+    |
+297 |         return None
+298 |
+299 |     async def _test_subdomain_takeover(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^
+300 |         return None
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:302:64
+    |
+300 |         return None
+301 |
+302 |     async def _test_host_header(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
+303 |         return None
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\agents\vuln_agent.py:305:57
+    |
+303 |         return None
+304 |
+305 |     async def _test_ssrf(self, url: str, depth: str) -> Optional[dict[str, Any]]:
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+306 |         import aiohttp
+307 |         # Test for SSRF by checking if the server fetches internal URLs
+    |
+help: Convert to `X | None`
+
+E501 Line too long (128 > 100)
+   --> backend\agents\vuln_agent.py:316:101
+    |
+314 |             for payload_url in payloads:
+315 |                 try:
+316 |                     async with session.get(payload_url, timeout=aiohttp.ClientTimeout(total=10), allow_redirects=False) as resp:
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+317 |                         text = await resp.text()
+318 |                         if any(indicator in text.lower() for indicator in ["127.0.0.1", "localhost", "meta-data", "ami-id"]):
+    |
+
+E501 Line too long (125 > 100)
+   --> backend\agents\vuln_agent.py:318:101
+    |
+316 |                     async with session.get(payload_url, timeout=aiohttp.ClientTimeout(total=10), allow_redirects=False) as resp:
+317 |                         text = await resp.text()
+318 |                         if any(indicator in text.lower() for indicator in ["127.0.0.1", "localhost", "meta-data", "ami-id"]):
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+319 |                             return {"confidence": 75, "payload": payload_url, "affected_url": payload_url}
+320 |                 except Exception:
+    |
+
+E501 Line too long (106 > 100)
+   --> backend\agents\vuln_agent.py:319:101
+    |
+317 |                         text = await resp.text()
+318 |                         if any(indicator in text.lower() for indicator in ["127.0.0.1", "localhost", "meta-data", "ami-id"]):
+319 |                             return {"confidence": 75, "payload": payload_url, "affected_url": payload_url}
+    |                                                                                                     ^^^^^^
+320 |                 except Exception:
+321 |                     continue
+    |
+
+F401 [*] `backend.core.redis_client.set_scan_status` imported but unused
+  --> backend\agents\watch_agent.py:11:39
+   |
+10 | from backend.agents.base_agent import BaseAgent
+11 | from backend.core.redis_client import set_scan_status
+   |                                       ^^^^^^^^^^^^^^^
+12 | from backend.models.database import Finding, Scan, WatchSchedule
+   |
+help: Remove unused import: `backend.core.redis_client.set_scan_status`
+
+F401 [*] `backend.models.database.Finding` imported but unused
+  --> backend\agents\watch_agent.py:12:37
+   |
+10 | from backend.agents.base_agent import BaseAgent
+11 | from backend.core.redis_client import set_scan_status
+12 | from backend.models.database import Finding, Scan, WatchSchedule
+   |                                     ^^^^^^^
+   |
+help: Remove unused import
+
+F401 [*] `backend.models.database.Scan` imported but unused
+  --> backend\agents\watch_agent.py:12:46
+   |
+10 | from backend.agents.base_agent import BaseAgent
+11 | from backend.core.redis_client import set_scan_status
+12 | from backend.models.database import Finding, Scan, WatchSchedule
+   |                                              ^^^^
+   |
+help: Remove unused import
+
+E501 Line too long (104 > 100)
+  --> backend\agents\watch_agent.py:29:101
+   |
+27 |             return {"scheduled": False}
+28 |
+29 |         await self.publish_update("running", 10, f"Registering watch schedule {schedule.watch_name}...")
+   |                                                                                                     ^^^^
+30 |         job = self.scheduler.add_job(
+31 |             self._run_watch, 
+   |
+
+W291 [*] Trailing whitespace
+  --> backend\agents\watch_agent.py:31:29
+   |
+29 |         await self.publish_update("running", 10, f"Registering watch schedule {schedule.watch_name}...")
+30 |         job = self.scheduler.add_job(
+31 |             self._run_watch, 
+   |                             ^
+32 |             trigger="interval",
+33 |             seconds=self._interval_seconds(schedule.schedule_type),
+   |
+help: Remove trailing whitespace
+
+E501 Line too long (103 > 100)
+  --> backend\agents\watch_agent.py:39:101
+   |
+37 |         )
+38 |
+39 |         await self.publish_update("complete", 100, f"Watch schedule registered: {schedule.watch_name}")
+   |                                                                                                     ^^^
+40 |         return {"scheduled": True, "job_id": job.id}
+   |
+
+E501 Line too long (113 > 100)
+  --> backend\agents\watch_agent.py:70:101
+   |
+68 |         # update schedule info after scan completion
+69 |         schedule.last_scan_id = scan_id
+70 |         schedule.next_run = datetime.utcnow() + timedelta(seconds=self._interval_seconds(schedule.schedule_type))
+   |                                                                                                     ^^^^^^^^^^^^^
+71 |         self.db.commit()
+   |
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\core\chroma_client.py:10:17
+   |
+ 8 | from backend.core.config import get_settings
+ 9 |
+10 | _chroma_client: Optional[chromadb.ClientAPI] = None
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | COLLECTIONS = [
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\core\chroma_client.py:37:12
+   |
+35 |     query_text: str,
+36 |     n_results: int = 5,
+37 |     where: Optional[dict[str, Any]] = None,
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^
+38 | ) -> list[dict[str, Any]]:
+39 |     client = get_chroma()
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\core\encryption.py:69:38
+   |
+67 |         return decrypt_data(encrypted)
+68 |
+69 |     def get(self, key: str, default: Optional[Any] = None) -> Any:
+   |                                      ^^^^^^^^^^^^^
+70 |         data = self.load()
+71 |         return data.get(key, default)
+   |
+help: Convert to `X | None`
+
+UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
+ --> backend\core\redis_client.py:5:1
+  |
+3 | import json
+4 | import logging
+5 | from typing import Any, AsyncGenerator, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |
+7 | import redis.asyncio as aioredis
+  |
+help: Import from `collections.abc`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\core\redis_client.py:13:16
+   |
+11 | logger = logging.getLogger(__name__)
+12 |
+13 | _redis_client: Optional[aioredis.Redis] = None
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^
+14 | _redis_available: Optional[bool] = None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\core\redis_client.py:14:19
+   |
+13 | _redis_client: Optional[aioredis.Redis] = None
+14 | _redis_available: Optional[bool] = None
+   |                   ^^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\core\redis_client.py:17:26
+   |
+17 | async def get_redis() -> Optional[aioredis.Redis]:
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^
+18 |     global _redis_client, _redis_available
+19 |     if _redis_available is False:
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\core\redis_client.py:56:44
+   |
+56 | async def get_scan_status(scan_id: str) -> Optional[str]:
+   |                                            ^^^^^^^^^^^^^
+57 |     r = await get_redis()
+58 |     if not r:
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\core\redis_client.py:123:47
+    |
+123 | async def get_attack_surface(scan_id: str) -> Optional[dict[str, Any]]:
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^
+124 |     r = await get_redis()
+125 |     if not r:
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\core\redis_client.py:137:41
+    |
+137 | async def get_sessions(scan_id: str) -> Optional[dict[str, Any]]:
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+138 |     r = await get_redis()
+139 |     if not r:
+    |
+help: Convert to `X | None`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\models\database.py:3:1
+   |
+ 1 |   """SQLAlchemy database setup and ORM models."""
+ 2 |
+ 3 | / import uuid
+ 4 | | from datetime import datetime
+ 5 | | from typing import Optional
+ 6 | |
+ 7 | | from sqlalchemy import (
+ 8 | |     Boolean,
+ 9 | |     Column,
+10 | |     DateTime,
+11 | |     Float,
+12 | |     Integer,
+13 | |     String,
+14 | |     Text,
+15 | |     create_engine,
+16 | |     ForeignKey,
+17 | |     text,
+18 | | )
+19 | | from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+20 | |
+21 | | from backend.core.config import get_settings
+   | |____________________________________________^
+   |
+help: Organize imports
+
+F401 [*] `typing.Optional` imported but unused
+ --> backend\models\database.py:5:20
+  |
+3 | import uuid
+4 | from datetime import datetime
+5 | from typing import Optional
+  |                    ^^^^^^^^
+6 |
+7 | from sqlalchemy import (
+  |
+help: Remove unused import: `typing.Optional`
+
+W293 [*] Blank line contains whitespace
+   --> backend\models\database.py:186:1
+    |
+184 |     with engine.connect() as conn:
+185 |         conn.execute(text("PRAGMA foreign_keys=ON"))
+186 |         
+    | ^^^^^^^^
+187 |         # Migrate scans table to add admin_mode
+188 |         scans_columns = {row[1] for row in conn.execute(text("PRAGMA table_info('scans')"))}
+    |
+help: Remove whitespace from blank line
+
+W293 [*] Blank line contains whitespace
+   --> backend\models\database.py:191:1
+    |
+189 |         if "admin_mode" not in scans_columns:
+190 |             conn.execute(text("ALTER TABLE scans ADD COLUMN admin_mode BOOLEAN DEFAULT 0"))
+191 |             
+    | ^^^^^^^^^^^^
+192 |         existing_columns = {row[1] for row in conn.execute(text("PRAGMA table_info('watch_schedules')"))}
+193 |         watch_columns = {
+    |
+help: Remove whitespace from blank line
+
+E501 Line too long (105 > 100)
+   --> backend\models\database.py:192:101
+    |
+190 |             conn.execute(text("ALTER TABLE scans ADD COLUMN admin_mode BOOLEAN DEFAULT 0"))
+191 |             
+192 |         existing_columns = {row[1] for row in conn.execute(text("PRAGMA table_info('watch_schedules')"))}
+    |                                                                                                     ^^^^^
+193 |         watch_columns = {
+194 |             'base_scan_id': 'VARCHAR',
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\routers\__init__.py:1:1
+  |
+1 | from . import auth, findings, scan, settings, watch, billing
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Organize imports
+
+F401 `.auth` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> backend\routers\__init__.py:1:15
+  |
+1 | from . import auth, findings, scan, settings, watch, billing
+  |               ^^^^
+  |
+help: Use an explicit re-export: `auth as auth`
+
+F401 `.findings` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> backend\routers\__init__.py:1:21
+  |
+1 | from . import auth, findings, scan, settings, watch, billing
+  |                     ^^^^^^^^
+  |
+help: Use an explicit re-export: `findings as findings`
+
+F401 `.scan` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> backend\routers\__init__.py:1:31
+  |
+1 | from . import auth, findings, scan, settings, watch, billing
+  |                               ^^^^
+  |
+help: Use an explicit re-export: `scan as scan`
+
+F401 `.settings` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> backend\routers\__init__.py:1:37
+  |
+1 | from . import auth, findings, scan, settings, watch, billing
+  |                                     ^^^^^^^^
+  |
+help: Use an explicit re-export: `settings as settings`
+
+F401 `.watch` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> backend\routers\__init__.py:1:47
+  |
+1 | from . import auth, findings, scan, settings, watch, billing
+  |                                               ^^^^^
+  |
+help: Use an explicit re-export: `watch as watch`
+
+F401 `.billing` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> backend\routers\__init__.py:1:54
+  |
+1 | from . import auth, findings, scan, settings, watch, billing
+  |                                                      ^^^^^^^
+  |
+help: Use an explicit re-export: `billing as billing`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\routers\findings.py:21:15
+   |
+19 | async def get_findings(
+20 |     scan_id: str,
+21 |     severity: Optional[str] = Query(None),
+   |               ^^^^^^^^^^^^^
+22 |     db: Session = Depends(get_db),
+23 | ):
+   |
+help: Convert to `X | None`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\routers\scan.py:3:1
+   |
+ 1 |   """Scan management API routes."""
+ 2 |
+ 3 | / import uuid
+ 4 | | from datetime import datetime
+ 5 | | from typing import Optional
+ 6 | |
+ 7 | | from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+ 8 | | from fastapi.responses import FileResponse
+ 9 | | from sqlalchemy.orm import Session
+10 | |
+11 | | from backend.agents.base_agent import AGENT_NAMES
+12 | | from backend.core.config import get_settings
+13 | | from backend.core.rate_limit import check_scan_rate_limit
+14 | | from backend.core.redis_client import get_agent_state, get_scan_status, set_scan_status
+15 | | from backend.models.database import Finding, Scan, get_db, Subscription
+16 | | from backend.models.schemas import (
+17 | |     AgentStatus,
+18 | |     FindingsCount,
+19 | |     ScanConfig,
+20 | |     ScanHistoryItem,
+21 | |     ScanStatus,
+22 | | )
+23 | | from backend.services.orchestrator import run_scan_pipeline, save_scan_config
+   | |_____________________________________________________________________________^
+24 |
+25 |   router = APIRouter(prefix="/api/scan", tags=["scan"])
+   |
+help: Organize imports
+
+F401 [*] `typing.Optional` imported but unused
+ --> backend\routers\scan.py:5:20
+  |
+3 | import uuid
+4 | from datetime import datetime
+5 | from typing import Optional
+  |                    ^^^^^^^^
+6 |
+7 | from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+  |
+help: Remove unused import: `typing.Optional`
+
+F401 [*] `fastapi.responses.FileResponse` imported but unused
+ --> backend\routers\scan.py:8:31
+  |
+7 | from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+8 | from fastapi.responses import FileResponse
+  |                               ^^^^^^^^^^^^
+9 | from sqlalchemy.orm import Session
+  |
+help: Remove unused import: `fastapi.responses.FileResponse`
+
+F401 [*] `backend.core.config.get_settings` imported but unused
+  --> backend\routers\scan.py:12:33
+   |
+11 | from backend.agents.base_agent import AGENT_NAMES
+12 | from backend.core.config import get_settings
+   |                                 ^^^^^^^^^^^^
+13 | from backend.core.rate_limit import check_scan_rate_limit
+14 | from backend.core.redis_client import get_agent_state, get_scan_status, set_scan_status
+   |
+help: Remove unused import: `backend.core.config.get_settings`
+
+F401 [*] `backend.core.redis_client.get_scan_status` imported but unused
+  --> backend\routers\scan.py:14:56
+   |
+12 | from backend.core.config import get_settings
+13 | from backend.core.rate_limit import check_scan_rate_limit
+14 | from backend.core.redis_client import get_agent_state, get_scan_status, set_scan_status
+   |                                                        ^^^^^^^^^^^^^^^
+15 | from backend.models.database import Finding, Scan, get_db, Subscription
+16 | from backend.models.schemas import (
+   |
+help: Remove unused import: `backend.core.redis_client.get_scan_status`
+
+E501 Line too long (128 > 100)
+  --> backend\routers\scan.py:43:101
+   |
+41 |     else:
+42 |         # Check active subscription
+43 |         active_sub = db.query(Subscription).filter_by(status="active").filter(Subscription.end_date > datetime.utcnow()).first()
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 |         if not active_sub:
+45 |             total_scans = db.query(Scan).count()
+   |
+
+E501 Line too long (150 > 100)
+  --> backend\routers\scan.py:49:101
+   |
+47 | â€¦
+48 | â€¦
+49 | â€¦al limit (3 scans) reached. Please purchase a subscription or activate Admin Mode to scan."
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+50 | â€¦
+51 | â€¦t.client else "default")
+   |
+
+F401 [*] `fastapi.Depends` imported but unused
+ --> backend\routers\settings.py:6:32
+  |
+4 | from pathlib import Path
+5 |
+6 | from fastapi import APIRouter, Depends
+  |                                ^^^^^^^
+7 |
+8 | from backend.core.config import get_settings
+  |
+help: Remove unused import: `fastapi.Depends`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\routers\watch.py:3:1
+   |
+ 1 |   """Watch schedule API routes."""
+ 2 |
+ 3 | / import json
+ 4 | | from datetime import datetime
+ 5 | | from typing import Any
+ 6 | |
+ 7 | | from fastapi import APIRouter, Depends, HTTPException
+ 8 | | from sqlalchemy.orm import Session
+ 9 | |
+10 | | from backend.models.database import WatchSchedule, get_db
+11 | | from backend.models.schemas import WatchScheduleItem, WatchSchedulePayload
+12 | | from backend.services.watch_scheduler import schedule_watch_job, cancel_watch_job
+   | |_________________________________________________________________________________^
+13 |
+14 |   router = APIRouter(prefix="/api/watch", tags=["watch"])
+   |
+help: Organize imports
+
+F401 [*] `typing.Any` imported but unused
+ --> backend\routers\watch.py:5:20
+  |
+3 | import json
+4 | from datetime import datetime
+5 | from typing import Any
+  |                    ^^^
+6 |
+7 | from fastapi import APIRouter, Depends, HTTPException
+  |
+help: Remove unused import: `typing.Any`
+
+E501 Line too long (110 > 100)
+  --> backend\routers\watch.py:53:101
+   |
+51 | @router.get("/list")
+52 | async def list_watch_schedules(db: Session = Depends(get_db)):
+53 |     schedules = db.query(WatchSchedule).filter_by(active=True).order_by(WatchSchedule.created_at.desc()).all()
+   |                                                                                                     ^^^^^^^^^^
+54 |     return [
+55 |         WatchScheduleItem(
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\services\orchestrator.py:3:1
+   |
+ 1 |   """Scan pipeline orchestrator â€” runs all 9 agents in sequence."""
+ 2 |
+ 3 | / import asyncio
+ 4 | | import json
+ 5 | | from datetime import datetime
+ 6 | | from typing import Any
+ 7 | |
+ 8 | | from sqlalchemy.orm import Session
+ 9 | |
+10 | | from backend.agents.auth_agent import AuthAgent
+11 | | from backend.agents.bugbounty_agent import BugBountyAgent
+12 | | from backend.agents.exploit_chain_agent import ExploitChainAgent
+13 | | from backend.agents.impact_agent import ImpactAgent
+14 | | from backend.agents.learning_agent import LearningAgent
+15 | | from backend.agents.recon_agent import ReconAgent
+16 | | from backend.agents.remediation_agent import RemediationAgent
+17 | | from backend.agents.report_agent import ReportAgent
+18 | | from backend.agents.scope_agent import ScopeAgent
+19 | | from backend.agents.verify_agent import VerifyAgent
+20 | | from backend.agents.vuln_agent import VulnAgent
+21 | | from backend.agents.base_agent import ScanCancelledException
+22 | | from backend.core.encryption import encrypt_data
+23 | | from backend.core.redis_client import set_scan_status
+24 | | from backend.models.database import Scan, ScanConfig, get_session_factory
+   | |_________________________________________________________________________^
+   |
+help: Organize imports
+
+F401 [*] `json` imported but unused
+ --> backend\services\orchestrator.py:4:8
+  |
+3 | import asyncio
+4 | import json
+  |        ^^^^
+5 | from datetime import datetime
+6 | from typing import Any
+  |
+help: Remove unused import: `json`
+
+F841 [*] Local variable `e` is assigned to but never used
+  --> backend\services\orchestrator.py:86:25
+   |
+84 |             db.commit()
+85 |         await set_scan_status(scan_id, "cancelled")
+86 |     except Exception as e:
+   |                         ^
+87 |         scan = db.query(Scan).filter_by(id=scan_id).first()
+88 |         if scan:
+   |
+help: Remove assignment to unused variable `e`
+
+F401 [*] `asyncio` imported but unused
+ --> backend\services\watch_scheduler.py:3:8
+  |
+1 | """Watch scheduler service for recurring scans and regression detection."""
+2 |
+3 | import asyncio
+  |        ^^^^^^^
+4 | import json
+5 | import logging
+  |
+help: Remove unused import: `asyncio`
+
+F401 [*] `typing.Any` imported but unused
+  --> backend\services\watch_scheduler.py:8:20
+   |
+ 6 | import uuid
+ 7 | from datetime import datetime, timedelta
+ 8 | from typing import Any, Optional
+   |                    ^^^
+ 9 |
+10 | import requests
+   |
+help: Remove unused import
+
+F401 [*] `typing.Optional` imported but unused
+  --> backend\services\watch_scheduler.py:8:25
+   |
+ 6 | import uuid
+ 7 | from datetime import datetime, timedelta
+ 8 | from typing import Any, Optional
+   |                         ^^^^^^^^
+ 9 |
+10 | import requests
+   |
+help: Remove unused import
+
+F401 [*] `sqlalchemy.orm.Session` imported but unused
+  --> backend\services\watch_scheduler.py:12:28
+   |
+10 | import requests
+11 | from apscheduler.schedulers.asyncio import AsyncIOScheduler
+12 | from sqlalchemy.orm import Session
+   |                            ^^^^^^^
+13 |
+14 | from backend.core.config import get_settings
+   |
+help: Remove unused import: `sqlalchemy.orm.Session`
+
+F841 Local variable `settings` is assigned to but never used
+  --> backend\services\watch_scheduler.py:78:9
+   |
+76 |             return
+77 |
+78 |         settings = get_settings()
+   |         ^^^^^^^^
+79 |         config = json.loads(schedule.scan_payload or "{}")
+80 |         config["scan_mode"] = "watch"
+   |
+help: Remove assignment to unused variable `settings`
+
+E501 Line too long (118 > 100)
+   --> backend\services\watch_scheduler.py:120:101
+    |
+118 |         previous_findings = []
+119 |         if schedule.last_scan_id:
+120 |             previous_findings = db.query(Finding).filter_by(scan_id=schedule.last_scan_id, false_positive=False).all()
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^
+121 |
+122 |         added, fixed = _compare_findings(previous_findings, current_findings)
+    |
+
+E501 Line too long (108 > 100)
+   --> backend\services\watch_scheduler.py:130:101
+    |
+128 |         schedule.last_scan_id = scan_id
+129 |         schedule.last_run = datetime.utcnow()
+130 |         schedule.next_run = datetime.utcnow() + timedelta(seconds=_interval_seconds(schedule.schedule_type))
+    |                                                                                                     ^^^^^^^^
+131 |         db.commit()
+    |
+
+E501 Line too long (110 > 100)
+   --> backend\services\watch_scheduler.py:139:101
+    |
+139 | def _compare_findings(previous: list[Finding], current: list[Finding]) -> tuple[list[Finding], list[Finding]]:
+    |                                                                                                     ^^^^^^^^^^
+140 |     prev_set = {(f.vuln_type, f.affected_url, f.affected_param) for f in previous}
+141 |     curr_set = {(f.vuln_type, f.affected_url, f.affected_param) for f in current}
+    |
+
+E501 Line too long (101 > 100)
+   --> backend\services\watch_scheduler.py:147:101
+    |
+147 | def _send_webhook_alert(schedule: WatchSchedule, added: list[Finding], fixed: list[Finding]) -> None:
+    |                                                                                                     ^
+148 |     payload = {
+149 |         "watch_name": schedule.watch_name,
+    |
+
+Found 134 errors.
+[*] 68 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).

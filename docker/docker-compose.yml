@@ -1,0 +1,61 @@
+name: aihax
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: aihax-redis
+    restart: unless-stopped
+    # Redis is internal-only — not exposed to host
+    command: redis-server --requirepass ${AIHAX_REDIS_PASSWORD:-aihax-redis-local-change-me}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${AIHAX_REDIS_PASSWORD:-aihax-redis-local-change-me}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aihax-backend
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - REDIS_URL=redis://:${AIHAX_REDIS_PASSWORD:-aihax-redis-local-change-me}@redis:6379
+      - DATABASE_URL=sqlite:////app/db/aihax.db
+      - CHROMA_PATH=/app/db/chroma
+      - REPORTS_PATH=/app/reports
+      - CONFIG_PATH=/app/config
+    volumes:
+      - ${AIHAX_REPORTS:-~/AihaX/Reports}:/app/reports
+      - ${AIHAX_DB:-~/AihaX/db}:/app/db
+      - ${AIHAX_CONFIG:-~/AihaX/config}:/app/config
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: aihax-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  redis_data:

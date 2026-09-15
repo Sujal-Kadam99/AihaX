@@ -1,0 +1,20 @@
+# {{ finding.title }}
+
+## Description
+A {{ finding.severity }} severity vulnerability ({{ finding.vuln_type }}) was discovered.
+
+## Target
+{{ finding.affected_url }}
+
+## Proof of Concept
+{% if finding.payload %}
+```
+{{ finding.payload }}
+```
+{% endif %}
+
+## Impact
+Confidence: {{ finding.confidence }}%
+
+## Recommended Fix
+Please implement proper input validation and output encoding.

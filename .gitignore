@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.local
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AihaX runtime data (user machine)
+# Reports, DB, and config are stored at ~/AihaX/ on the host
+
+# Build outputs
+electron/dist/
+frontend/dist/
+
+# Docker
+docker/*.log
+
+# Secrets
+**/vault.enc
+**/settings.json
+**/.api_token
+
+# Playwright
+playwright-report/
+test-results/
+
+# SQLite
+*.db
+*.db-journal
+
+# ChromaDB
+chroma/
+
+# Reports
+reports/
+*.pdf

@@ -1,0 +1,18 @@
+<h1>{{ finding.title }}</h1>
+
+<h2>Summary</h2>
+<p>A {{ finding.severity }} severity {{ finding.vuln_type }} vulnerability was identified at {{ finding.affected_url }}.</p>
+
+<h2>Steps to Reproduce</h2>
+<ol>
+    <li>Navigate to {{ finding.affected_url }}</li>
+    {% if finding.affected_param %}<li>Target the <code>{{ finding.affected_param }}</code> parameter</li>{% endif %}
+    {% if finding.payload %}<li>Submit the following payload: <code>{{ finding.payload }}</code></li>{% endif %}
+    <li>Observe the vulnerability confirmation</li>
+</ol>
+
+<h2>Impact</h2>
+<p>This vulnerability has a confidence score of {{ finding.confidence }}% and is classified as {{ finding.severity }} severity.</p>
+
+<h2>Supporting Material</h2>
+<p>Category: {{ finding.category }} | CWE: {{ finding.cwe_id or 'N/A' }}</p>
