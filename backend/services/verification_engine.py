@@ -384,7 +384,6 @@ class VerificationRegistry:
         "C001_Open_Port_80": "transport_security",
         "C002_Missing_Security_Headers": "http_response_property",
         "C003_Sensitive_Files_Exposure": "sensitive_file_exposure",
-        "C004_CORS_Misconfiguration": "cors_misconfiguration",
         "C005_GraphQL_Introspection": "graphql_introspection",
         "C006_Directory_Listing": "directory_listing",
         "C007_Open_Redirect": "open_redirect",
@@ -396,12 +395,10 @@ class VerificationRegistry:
         "C013_Weak_Session_Cookie": "http_response_property",
         "C014_Missing_Secure_Cookie": "http_response_property",
         "C015_Missing_HttpOnly_Cookie": "http_response_property",
-        "C016_Missing_SameSite_Cookie": "http_response_property",
         "C017_Session_Fixation": "generic_reproducibility",
         "C018_Session_Invalidation": "authentication_comparison",
         "C019_Password_Policy_Weakness": "generic_reproducibility",
-        "C020_JWT_Algorithm_Weakness": "authentication_comparison",
-        "C021_JWT_Claim_Validation": "authentication_comparison",
+        "C021_JWT_Claim_Validation": "C020_JWT_Algorithm_Weakness",
         "C022_Auth_Rate_Limit": "auth_rate_limit",
         "C022_AUTH_RATE_LIMIT": "auth_rate_limit",
         "C022_Authentication_Rate_Limit_Weakness": "auth_rate_limit",
@@ -415,7 +412,6 @@ class VerificationRegistry:
         "C030_CRLF_Injection": "http_response_property",
         "C031_Path_Traversal": "generic_reproducibility",
         "C032_Local_File_Inclusion": "generic_reproducibility",
-        "C033_XXE_Indicators": "generic_reproducibility",
         "C034_LDAP_Injection": "generic_reproducibility",
         "C035_EL_Injection": "generic_reproducibility",
         "C036_SSRF_Indicators": "generic_reproducibility",
@@ -437,7 +433,6 @@ class VerificationRegistry:
         "C052_Insecure_HTTP_Methods": "http_response_property",
         "C053_Default_Setup_Page": "sensitive_file_exposure",
         "C054_Verbose_Error_Disclosure": "generic_reproducibility",
-        "C055_Dangerous_File_Upload": "generic_reproducibility",
         "C056_Path_Normalization": "generic_reproducibility",
         "C057_Exposed_API_Keys": "sensitive_file_exposure",
         "C058_Source_Map_Exposure": "sensitive_file_exposure",
@@ -1781,10 +1776,21 @@ from backend.services.verification_strategies.sql_injection_strategy import SqlI
 from backend.services.verification_strategies.blind_sql_injection_strategy import BlindSqlInjectionVerificationStrategy
 from backend.services.verification_strategies.command_injection_strategy import CommandInjectionVerificationStrategy
 from backend.services.verification_strategies.open_redirect_strategy import OpenRedirectVerificationStrategy
+from backend.services.verification_strategies.csrf_strategy import CsrfVerificationStrategy
+from backend.services.verification_strategies.cors_strategy import CorsVerificationStrategy
+from backend.services.verification_strategies.jwt_strategy import JwtVerificationStrategy
+from backend.services.verification_strategies.file_upload_strategy import FileUploadVerificationStrategy
+from backend.services.verification_strategies.xxe_strategy import XxeVerificationStrategy
+
 VerificationRegistry.register(SqlInjectionVerificationStrategy)
 VerificationRegistry.register(BlindSqlInjectionVerificationStrategy)
 VerificationRegistry.register(CommandInjectionVerificationStrategy)
 VerificationRegistry.register(OpenRedirectVerificationStrategy)
+VerificationRegistry.register(CsrfVerificationStrategy)
+VerificationRegistry.register(CorsVerificationStrategy)
+VerificationRegistry.register(JwtVerificationStrategy)
+VerificationRegistry.register(FileUploadVerificationStrategy)
+VerificationRegistry.register(XxeVerificationStrategy)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

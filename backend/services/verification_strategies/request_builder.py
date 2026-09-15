@@ -8,7 +8,7 @@ def build_injected_request(candidate: dict, new_payload: str) -> Optional[Reques
     affected_param = candidate.get("affected_param") or candidate.get("location")
     proof_request = candidate.get("proof_request", "")
     
-    if not affected_url or not affected_param or not proof_request:
+    if not affected_url or not proof_request:
         return None
         
     # Parse proof_request to reconstruct the request details
@@ -45,7 +45,7 @@ def build_injected_request(candidate: dict, new_payload: str) -> Optional[Reques
     query_params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
     
     # 1. Check if param is in query string
-    if affected_param in query_params:
+    if affected_param and affected_param in query_params:
         query_params[affected_param] = [new_payload]
         new_query = urllib.parse.urlencode(query_params, doseq=True)
         new_url = urllib.parse.urlunparse(parsed._replace(query=new_query))
@@ -53,7 +53,7 @@ def build_injected_request(candidate: dict, new_payload: str) -> Optional[Reques
         
     # 2. Check if param is in JSON body (by content type or just shape)
     content_type = headers.get("Content-Type", "").lower()
-    if body and ("application/json" in content_type or body.strip().startswith("{")):
+    if affected_param and body and ("application/json" in content_type or body.strip().startswith("{")):
         try:
             data = json.loads(body)
             if affected_param in data:
@@ -74,7 +74,7 @@ def build_injected_request(candidate: dict, new_payload: str) -> Optional[Reques
             pass
             
     # 3. Check if param is in form body
-    if body and "application/x-www-form-urlencoded" in content_type:
+    if affected_param and body and "application/x-www-form-urlencoded" in content_type:
         body_params = urllib.parse.parse_qs(body, keep_blank_values=True)
         if affected_param in body_params:
             body_params[affected_param] = [new_payload]
@@ -82,11 +82,11 @@ def build_injected_request(candidate: dict, new_payload: str) -> Optional[Reques
             return RequestSpec(url=affected_url, method=method, headers=headers, body=new_body)
             
     # 4. Check if param is a header
-    if affected_param in headers or affected_param.lower() in [k.lower() for k in headers.keys()]:
+    if affected_param and (affected_param in headers or affected_param.lower() in [k.lower() for k in headers.keys()]):
         new_headers = dict(headers)
         # Find exact case
         target_key = next((k for k in new_headers.keys() if k.lower() == affected_param.lower()), affected_param)
         new_headers[target_key] = new_payload
         return RequestSpec(url=affected_url, method=method, headers=new_headers, body=body)
-        
-    return None
+    # 5. Fallback: return the un-injected base request
+    return RequestSpec(url=affected_url, method=method, headers=headers, body=body)
