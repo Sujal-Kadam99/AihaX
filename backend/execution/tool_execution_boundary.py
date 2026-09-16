@@ -20,6 +20,7 @@ import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -514,6 +515,13 @@ class ToolExecutionBoundary:
         tools_dir = os.environ.get("AIHAX_TOOLS_DIR")
         if tools_dir and os.path.isdir(tools_dir):
             found = shutil.which(tool_def.executable, path=tools_dir)
+            if found:
+                return found
+
+        # Fallback to project bin/tools directory if present
+        default_tools_dir = Path(__file__).resolve().parent.parent.parent / "bin" / "tools"
+        if default_tools_dir.is_dir():
+            found = shutil.which(tool_def.executable, path=str(default_tools_dir))
             if found:
                 return found
 

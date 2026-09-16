@@ -247,6 +247,7 @@ class ReconAgent(BaseAgent):
             enable_tls_analysis=bool(self.config.get("enable_tls_analysis", True)),
             timeout_per_tool=int(self.config.get("timeout_per_tool", 60)),
             allow_loopback=bool(self.config.get("allow_loopback", False)),
+            execution_mode=str(self.config.get("execution_mode", "AUTHORIZED_LIVE_RECON" if bool(self.config.get("authorization_confirmed", True)) else "AUDIT")),
             wordlist_path=Path(self.config["wordlist_path"]) if "wordlist_path" in self.config else _DEFAULT_WORDLIST,
         )
 
@@ -261,7 +262,16 @@ class ReconAgent(BaseAgent):
         attack_surface: Dict[str, Any] = {
             "domain": normalize_hostname(target_url),
             "subdomains": [o.normalized_value for o in snapshot.observations if o.category == ReconObservationCategory.SUBDOMAIN.value],
-            "endpoints": [o.normalized_value for o in snapshot.observations if o.category in (ReconObservationCategory.ENDPOINT.value, ReconObservationCategory.HISTORICAL_URL.value)],
+            "endpoints": [
+                o.normalized_value for o in snapshot.observations 
+                if o.category in (
+                    ReconObservationCategory.ENDPOINT.value, 
+                    ReconObservationCategory.HISTORICAL_URL.value,
+                    ReconObservationCategory.DIRECTORY.value,
+                    ReconObservationCategory.FILE.value,
+                    ReconObservationCategory.API_ROUTE.value,
+                )
+            ],
             "ports": [o.metadata for o in snapshot.observations if o.category == ReconObservationCategory.PORT.value],
             "tech_stack": [o.metadata for o in snapshot.observations if o.category == ReconObservationCategory.TECHNOLOGY.value],
             "ssl_info": next((o.metadata for o in snapshot.observations if o.category == ReconObservationCategory.CERTIFICATE.value), {}),
@@ -347,6 +357,7 @@ class ReconAgent(BaseAgent):
         # 3. Destination Safety Gating (Anti-SSRF)
         is_safe, safety_reason = validate_destination_safety(
             target_url,
+            allow_loopback=config.allow_loopback,
             allowed_ports=set(config.allowed_ports) if config.allowed_ports else None,
         )
         if not is_safe:

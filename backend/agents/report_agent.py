@@ -51,11 +51,15 @@ class ReportAgent(BaseAgent):
             html = template.render(**report_data)
 
             await self.publish_update("running", 75, "Generating PDF...")
-            from weasyprint import HTML
-
             report_path = Path(settings.reports_path) / f"{self.scan_id}.pdf"
             report_path.parent.mkdir(parents=True, exist_ok=True)
-            HTML(string=html, base_url="file:///dev/null/").write_pdf(str(report_path))
+            try:
+                from weasyprint import HTML
+                HTML(string=html, base_url="file:///dev/null/").write_pdf(str(report_path))
+            except Exception as pdf_err:
+                self.log("warning", f"PDF generation unavailable ({pdf_err}), saving HTML report fallback.")
+                report_path = Path(settings.reports_path) / f"{self.scan_id}.html"
+                report_path.write_text(html, encoding="utf-8")
 
             if scan is not None:
                 setattr(scan, "report_path", str(report_path))
