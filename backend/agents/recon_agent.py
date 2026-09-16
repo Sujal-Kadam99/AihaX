@@ -23,8 +23,13 @@ import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import parse_qs, urljoin, urlparse
+
+# Default wordlist path: {project_root}/wordlists/common.txt
+# Resolved relative to this file so it works on any machine or in Docker.
+_DEFAULT_WORDLIST = Path(__file__).resolve().parent.parent.parent / "wordlists" / "common.txt"
 
 from sqlalchemy.orm import Session
 
@@ -124,9 +129,12 @@ class ReconExecutionConfig:
     enable_tech_detection: bool = True
     enable_url_discovery: bool = True
     enable_directory_discovery: bool = True
+    enable_active_crawler: bool = True
     enable_dns_analysis: bool = True
     enable_tls_analysis: bool = True
     timeout_per_tool: int = 60
+    allow_loopback: bool = False
+    wordlist_path: Path = field(default_factory=lambda: _DEFAULT_WORDLIST)
 
 
 @dataclass
@@ -238,6 +246,8 @@ class ReconAgent(BaseAgent):
             enable_dns_analysis=bool(self.config.get("enable_dns_analysis", True)),
             enable_tls_analysis=bool(self.config.get("enable_tls_analysis", True)),
             timeout_per_tool=int(self.config.get("timeout_per_tool", 60)),
+            allow_loopback=bool(self.config.get("allow_loopback", False)),
+            wordlist_path=Path(self.config["wordlist_path"]) if "wordlist_path" in self.config else _DEFAULT_WORDLIST,
         )
 
         await self.check_cancelled()
@@ -387,6 +397,7 @@ class ReconAgent(BaseAgent):
                     execution_mode=config.execution_mode,
                     in_scope_assets=in_scope,
                     out_of_scope_assets=config.out_of_scope_assets,
+                    allow_loopback=config.allow_loopback,
                 ),
                 db=db,
             )
@@ -418,6 +429,7 @@ class ReconAgent(BaseAgent):
                     execution_mode=config.execution_mode,
                     in_scope_assets=in_scope,
                     out_of_scope_assets=config.out_of_scope_assets,
+                    allow_loopback=config.allow_loopback,
                 ),
                 db=db,
             )
@@ -451,6 +463,7 @@ class ReconAgent(BaseAgent):
                     execution_mode=config.execution_mode,
                     in_scope_assets=in_scope,
                     out_of_scope_assets=config.out_of_scope_assets,
+                    allow_loopback=config.allow_loopback,
                 ),
                 db=db,
             )
@@ -483,6 +496,7 @@ class ReconAgent(BaseAgent):
                     execution_mode=config.execution_mode,
                     in_scope_assets=in_scope,
                     out_of_scope_assets=config.out_of_scope_assets,
+                    allow_loopback=config.allow_loopback,
                 ),
                 db=db,
             )
@@ -502,6 +516,45 @@ class ReconAgent(BaseAgent):
                             )
                         )
 
+            # Katana (Active Crawler)
+            if config.enable_active_crawler and config.authorization_confirmed:
+                katana_res = await self.tool_boundary.execute(
+                    ToolExecutionRequest(
+                        campaign_id=config.campaign_id,
+                        target=target_url,
+                        tool_name="katana",
+                        execution_profile=ExecutionProfile.URL_DISCOVERY.value,
+                        args=["-u", target_url, "-silent", "-jc", "-d", "1"],
+                        timeout_seconds=config.timeout_per_tool * 2,
+                        authorization_confirmed=config.authorization_confirmed,
+                        execution_mode=config.execution_mode,
+                        in_scope_assets=in_scope,
+                        out_of_scope_assets=config.out_of_scope_assets,
+                        allow_loopback=config.allow_loopback,
+                    ),
+                    db=db,
+                )
+                tool_results["katana"] = katana_res.to_dict()
+                if katana_res.execution_status == ToolExecutionStatus.SUCCESS.value and katana_res.stdout:
+                    import json
+                    for line in katana_res.stdout.splitlines()[:500]:
+                        try:
+                            data = json.loads(line)
+                            url = data.get("request", {}).get("endpoint") or data.get("endpoint") or line.strip()
+                        except:
+                            url = line.strip()
+                        if url and url.startswith("http"):
+                            canon = canonicalize_url(url)
+                            raw_observations.append(
+                                ReconObservation(
+                                    category=ReconObservationCategory.ENDPOINT.value,
+                                    value=url,
+                                    normalized_value=canon,
+                                    discovered_by=["katana"],
+                                    evidence_hash=katana_res.stdout_hash,
+                                )
+                            )
+
         # 7. Technology Fingerprinting (WhatWeb)
         if config.enable_tech_detection:
             whatweb_res = await self.tool_boundary.execute(
@@ -516,6 +569,7 @@ class ReconAgent(BaseAgent):
                     execution_mode=config.execution_mode,
                     in_scope_assets=in_scope,
                     out_of_scope_assets=config.out_of_scope_assets,
+                    allow_loopback=config.allow_loopback,
                 ),
                 db=db,
             )
@@ -537,6 +591,7 @@ class ReconAgent(BaseAgent):
                     execution_mode=config.execution_mode,
                     in_scope_assets=in_scope,
                     out_of_scope_assets=config.out_of_scope_assets,
+                    allow_loopback=config.allow_loopback,
                 ),
                 db=db,
             )
@@ -552,12 +607,13 @@ class ReconAgent(BaseAgent):
                     target=target_url,
                     tool_name="gobuster",
                     execution_profile=ExecutionProfile.DIRECTORY_DISCOVERY.value,
-                    args=["dir", "-u", target_url, "-q"],
+                    args=["dir", "-u", target_url, "-q", "-w", str(config.wordlist_path)],
                     timeout_seconds=config.timeout_per_tool,
                     authorization_confirmed=config.authorization_confirmed,
                     execution_mode=config.execution_mode,
                     in_scope_assets=in_scope,
                     out_of_scope_assets=config.out_of_scope_assets,
+                    allow_loopback=config.allow_loopback,
                 ),
                 db=db,
             )

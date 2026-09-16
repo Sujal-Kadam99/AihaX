@@ -222,6 +222,17 @@ ALLOWED_TOOLS: Dict[str, ToolDefinition] = {
         max_timeout=120,
         allowed_flags={"url", "--silence", "--format", "json", "--skip-bav", "--timeout"},
     ),
+    "katana": ToolDefinition(
+        name="katana",
+        executable="katana",
+        capability_class=CapabilityClass.PASSIVE_RECON,
+        allowed_profiles={ExecutionProfile.URL_DISCOVERY.value},
+        is_active=True,
+        requires_authorization=True,
+        default_timeout=120,
+        max_timeout=240,
+        allowed_flags={"-u", "-silent", "-jc", "-d"},
+    ),
 }
 
 
@@ -244,6 +255,7 @@ class ToolExecutionRequest:
     allowed_ports: List[int] = field(default_factory=list)
     excluded_ports: List[int] = field(default_factory=list)
     custom_executable_path: Optional[str] = None
+    allow_loopback: bool = False
 
 
 @dataclass
@@ -361,7 +373,11 @@ class ToolExecutionBoundary:
             )
 
         # 5. Validate Destination Safety (Anti-SSRF, RFC1918, Cloud Metadata)
-        is_safe, safety_reason = validate_destination_safety(target, allowed_ports=set(request.allowed_ports) if request.allowed_ports else None)
+        is_safe, safety_reason = validate_destination_safety(
+            target, 
+            allow_loopback=request.allow_loopback,
+            allowed_ports=set(request.allowed_ports) if request.allowed_ports else None
+        )
         if not is_safe:
             return self._build_result(
                 execution_id=execution_id,

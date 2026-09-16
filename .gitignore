@@ -53,3 +53,26 @@ chroma/
 # Reports
 reports/
 *.pdf
+
+# Scratch runtime artifacts (scan logs, results, tool output — do not commit)
+scratch/*.log
+scratch/*.md
+scratch/tool_results*.txt
+scratch/katana_test.txt
+scratch/wordlist.txt
+scratch/e2e_*.py
+scratch/run_full_*.py
+scratch/print_*.py
+scratch/check_*.py
+scratch/install_*.py
+scratch/test_c*.py
+
+# Binary tool installers and extracted tool directories (never commit)
+*.zip
+*.exe
+*.msi
+bin/
+go.zip
+nmap-setup.exe
+nmap.zip
+gopath/
