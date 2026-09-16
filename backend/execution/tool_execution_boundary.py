@@ -232,7 +232,7 @@ ALLOWED_TOOLS: Dict[str, ToolDefinition] = {
         requires_authorization=True,
         default_timeout=120,
         max_timeout=240,
-        allowed_flags={"-u", "-silent", "-jc", "-d"},
+        allowed_flags={"-u", "-silent", "-jc", "-d", "-duc", "-timeout", "-c", "-j", "-jsonl"},
     ),
 }
 
@@ -591,6 +591,7 @@ class ToolExecutionBoundary:
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd_argv,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
