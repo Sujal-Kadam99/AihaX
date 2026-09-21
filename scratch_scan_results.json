@@ -1,0 +1,392 @@
+{
+  "dvwa": {
+    "target_name": "DVWA (Damn Vulnerable Web Application)",
+    "target_url": "http://localhost:8080",
+    "scan_id": "47deebf7-7c98-478f-ae6a-940fe96ae3ba",
+    "scan_status": "complete",
+    "duration_seconds": 175.18,
+    "recon_summary": {
+      "recon_observations_count": 0,
+      "total_endpoints_discovered": 2,
+      "total_params_discovered": 0,
+      "endpoints": [
+        "http://localhost:8080",
+        "http://localhost:8080/.gitignore"
+      ],
+      "params": [],
+      "tool_results_summary": {},
+      "evidence_records_count": 122,
+      "audit_events_count": 868
+    },
+    "total_findings": 12,
+    "status_counts": {
+      "HARDENING_ONLY": 10,
+      "INCONCLUSIVE": 2
+    },
+    "check_id_counts": {
+      "C002_Missing_Security_Headers": 2,
+      "C010_TLS_Configuration_Weakness": 2,
+      "C047_Missing_CSP": 2,
+      "C048_Weak_CSP": 2,
+      "C049_Clickjacking": 2,
+      "C073_Parameter_Tampering": 1,
+      "C075_Race_Condition": 1
+    },
+    "verified_findings": [],
+    "pipeline_error": null,
+    "agent_log_count": 12,
+    "all_findings": [
+      {
+        "id": "find-1c1a907e07ce",
+        "title": "C002: DETECTED",
+        "vuln_type": "C002_Missing_Security_Headers",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-9eef219c4dd8",
+        "title": "C002: DETECTED",
+        "vuln_type": "C002_Missing_Security_Headers",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080/.gitignore",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-c78f4e0e0ebb",
+        "title": "C010: DETECTED",
+        "vuln_type": "C010_TLS_Configuration_Weakness",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-e10618c7be91",
+        "title": "C010: DETECTED",
+        "vuln_type": "C010_TLS_Configuration_Weakness",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080/.gitignore",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-2de841716a06",
+        "title": "C047: DETECTED",
+        "vuln_type": "C047_Missing_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-6712f83c03ac",
+        "title": "C047: DETECTED",
+        "vuln_type": "C047_Missing_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080/.gitignore",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-3d73a80d3bee",
+        "title": "C048: DETECTED",
+        "vuln_type": "C048_Weak_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-0d7e3fc4966a",
+        "title": "C048: DETECTED",
+        "vuln_type": "C048_Weak_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080/.gitignore",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-2b8ec58fc9f2",
+        "title": "C049: DETECTED",
+        "vuln_type": "C049_Clickjacking",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-aa5802c5fe14",
+        "title": "C049: DETECTED",
+        "vuln_type": "C049_Clickjacking",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080/.gitignore",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-6d66357cfb95",
+        "title": "C073: DETECTED",
+        "vuln_type": "C073_Parameter_Tampering",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080/.gitignore",
+        "affected_param": null,
+        "status": "INCONCLUSIVE",
+        "verdict": "Inconclusive",
+        "reason_code": "MISSING_EVIDENCE",
+        "confidence_reason": "No parameter specified in observed_data"
+      },
+      {
+        "id": "find-75d38965b1e0",
+        "title": "C075: DETECTED",
+        "vuln_type": "C075_Race_Condition",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:8080/.gitignore",
+        "affected_param": null,
+        "status": "INCONCLUSIVE",
+        "verdict": "Inconclusive",
+        "reason_code": "OUT_OF_SCOPE_BLOCKED",
+        "confidence_reason": "Race condition testing safeguard enabled (permit_race_condition_testing=False)."
+      }
+    ]
+  },
+  "juiceshop": {
+    "target_name": "OWASP Juice Shop",
+    "target_url": "http://localhost:3001",
+    "scan_id": "6bb95f64-e635-42e4-9bc6-6aa2c6045cff",
+    "scan_status": "complete",
+    "duration_seconds": 189.3,
+    "recon_summary": {
+      "recon_observations_count": 0,
+      "total_endpoints_discovered": 2,
+      "total_params_discovered": 0,
+      "endpoints": [
+        "http://localhost:3001",
+        "http://localhost:3001/"
+      ],
+      "params": [],
+      "tool_results_summary": {},
+      "evidence_records_count": 122,
+      "audit_events_count": 870
+    },
+    "total_findings": 14,
+    "status_counts": {
+      "HARDENING_ONLY": 10,
+      "INCONCLUSIVE": 4
+    },
+    "check_id_counts": {
+      "C002_Missing_Security_Headers": 2,
+      "C010_TLS_Configuration_Weakness": 2,
+      "C047_Missing_CSP": 2,
+      "C048_Weak_CSP": 2,
+      "C049_Clickjacking": 2,
+      "C073_Parameter_Tampering": 2,
+      "C075_Race_Condition": 2
+    },
+    "verified_findings": [],
+    "pipeline_error": null,
+    "agent_log_count": 12,
+    "all_findings": [
+      {
+        "id": "find-3c313d6455d6",
+        "title": "C002: DETECTED",
+        "vuln_type": "C002_Missing_Security_Headers",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-c0ecdc92ca7f",
+        "title": "C002: DETECTED",
+        "vuln_type": "C002_Missing_Security_Headers",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001/",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-4dc65285d30b",
+        "title": "C010: DETECTED",
+        "vuln_type": "C010_TLS_Configuration_Weakness",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-f65cc274a992",
+        "title": "C010: DETECTED",
+        "vuln_type": "C010_TLS_Configuration_Weakness",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001/",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-33e04d902dce",
+        "title": "C047: DETECTED",
+        "vuln_type": "C047_Missing_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-fd58c5681f68",
+        "title": "C047: DETECTED",
+        "vuln_type": "C047_Missing_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001/",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-bc68a1459439",
+        "title": "C048: DETECTED",
+        "vuln_type": "C048_Weak_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-0f2f833d6cb3",
+        "title": "C048: DETECTED",
+        "vuln_type": "C048_Weak_CSP",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001/",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-d68b58445491",
+        "title": "C049: DETECTED",
+        "vuln_type": "C049_Clickjacking",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-ce3dfc3190d9",
+        "title": "C049: DETECTED",
+        "vuln_type": "C049_Clickjacking",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001/",
+        "affected_param": null,
+        "status": "HARDENING_ONLY",
+        "verdict": "Hardening Only",
+        "reason_code": "HARDENING_OBSERVED",
+        "confidence_reason": "Observed condition: 'strict-transport-security' header is absent in live response (defense-in-depth hardening recommendation)."
+      },
+      {
+        "id": "find-5b33a13a8ed7",
+        "title": "C073: DETECTED",
+        "vuln_type": "C073_Parameter_Tampering",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001",
+        "affected_param": null,
+        "status": "INCONCLUSIVE",
+        "verdict": "Inconclusive",
+        "reason_code": "MISSING_EVIDENCE",
+        "confidence_reason": "No parameter specified in observed_data"
+      },
+      {
+        "id": "find-68b3db341d77",
+        "title": "C073: DETECTED",
+        "vuln_type": "C073_Parameter_Tampering",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001/",
+        "affected_param": null,
+        "status": "INCONCLUSIVE",
+        "verdict": "Inconclusive",
+        "reason_code": "MISSING_EVIDENCE",
+        "confidence_reason": "No parameter specified in observed_data"
+      },
+      {
+        "id": "find-fc7eb905c38d",
+        "title": "C075: DETECTED",
+        "vuln_type": "C075_Race_Condition",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001",
+        "affected_param": null,
+        "status": "INCONCLUSIVE",
+        "verdict": "Inconclusive",
+        "reason_code": "OUT_OF_SCOPE_BLOCKED",
+        "confidence_reason": "Race condition testing safeguard enabled (permit_race_condition_testing=False)."
+      },
+      {
+        "id": "find-1642e7621850",
+        "title": "C075: DETECTED",
+        "vuln_type": "C075_Race_Condition",
+        "severity": "MEDIUM",
+        "affected_url": "http://localhost:3001/",
+        "affected_param": null,
+        "status": "INCONCLUSIVE",
+        "verdict": "Inconclusive",
+        "reason_code": "OUT_OF_SCOPE_BLOCKED",
+        "confidence_reason": "Race condition testing safeguard enabled (permit_race_condition_testing=False)."
+      }
+    ]
+  }
+}

@@ -93,9 +93,9 @@ async def test_safe_scan_coverage_validator_end_to_end(live_lab_server):
     # Build coverage report
     coverage = CoverageValidator.build_coverage_report(result)
 
-    # Coverage report must have exactly 77 checks
-    assert coverage.total_registered_checks == 77
-    assert len(coverage.records) == 77
+    # Coverage report must have exactly 86 checks
+    assert coverage.total_registered_checks == 86
+    assert len(coverage.records) == 86
 
     # At least some checks must have been executed
     assert coverage.checks_executed >= 55, (
@@ -140,9 +140,9 @@ async def test_safe_scan_coverage_validator_end_to_end(live_lab_server):
     import json
     raw_json = coverage.to_json()
     parsed = json.loads(raw_json)
-    assert parsed["summary"]["total_registered_checks"] == 77
+    assert parsed["summary"]["total_registered_checks"] == 86
     assert parsed["summary"]["checks_executed"] == coverage.checks_executed
-    assert len(parsed["records"]) == 77
+    assert len(parsed["records"]) == 86
 
 
 @pytest.mark.asyncio
@@ -251,7 +251,7 @@ async def test_out_of_scope_campaign_zero_execution():
     # Coverage report must show 0 executed checks
     coverage = CoverageValidator.build_coverage_report(result)
     assert coverage.checks_executed == 0
-    assert coverage.total_registered_checks == 77
+    assert coverage.total_registered_checks == 86
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -386,9 +386,9 @@ async def test_recon_only_mode_coverage_report(live_lab_server):
 
     # CoverageValidator works on RECON_ONLY result too
     coverage = CoverageValidator.build_coverage_report(result)
-    assert coverage.total_registered_checks == 77
+    assert coverage.total_registered_checks == 86
     assert coverage.checks_executed == 0
-    assert len(coverage.records) == 77
+    assert len(coverage.records) == 86
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -420,9 +420,9 @@ async def test_plan_only_mode_coverage_report(live_lab_server):
 
     # CoverageValidator works on PLAN_ONLY result
     coverage = CoverageValidator.build_coverage_report(result)
-    assert coverage.total_registered_checks == 77
+    assert coverage.total_registered_checks == 86
     assert coverage.checks_executed == 0
-    assert len(coverage.records) == 77
+    assert len(coverage.records) == 86
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -430,10 +430,10 @@ async def test_plan_only_mode_coverage_report(live_lab_server):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_registry_completeness_phase6():
-    """Phase 6: CoverageValidator.validate_registry_completeness must pass for 77 checks."""
-    result = CoverageValidator.validate_registry_completeness(expected_count=77)
+    """Phase 6: CoverageValidator.validate_registry_completeness must pass for 86 checks."""
+    result = CoverageValidator.validate_registry_completeness(expected_count=86)
     assert result["all_valid"] is True
-    assert result["actual_count"] == 77
+    assert result["actual_count"] == 86
 
 
 def test_registry_matrix_all_checks_have_check_id_field():
@@ -481,17 +481,17 @@ def test_all_77_check_ids_follow_c_prefix_numbering():
 
 
 def test_checks_c001_through_c077_all_registered():
-    """Checks C001 through C077 must all be present in the registry."""
+    """Checks C001 through C086 must all be present in the registry."""
     registered_ids = {c.id for c in registry.list_checks()}
-    # Verify numbering: at least 77 distinct numeric IDs in range 001-099
+    # Verify numbering: at least 86 distinct numeric IDs in range 001-099
     numeric_parts = set()
     for cid in registered_ids:
         parts = cid.split("_")
         if parts and parts[0].startswith("C") and parts[0][1:].isdigit():
             numeric_parts.add(int(parts[0][1:]))
 
-    assert len(numeric_parts) == 77, (
-        f"Expected 77 distinct check numbers, found {len(numeric_parts)}: {sorted(numeric_parts)}"
+    assert len(numeric_parts) == 86, (
+        f"Expected 86 distinct check numbers, found {len(numeric_parts)}: {sorted(numeric_parts)}"
     )
     assert min(numeric_parts) == 1, f"Minimum check number must be 1, got {min(numeric_parts)}"
-    assert max(numeric_parts) == 77, f"Maximum check number must be 77, got {max(numeric_parts)}"
+    assert max(numeric_parts) == 86, f"Maximum check number must be 86, got {max(numeric_parts)}"
