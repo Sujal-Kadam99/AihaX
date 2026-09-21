@@ -19,30 +19,30 @@ from backend.services.request_engine import (
 from backend.services.verification_engine import VerificationRegistry
 
 
-def _get_production_77_checks():
+def _get_production_checks():
     return [c for c in registry.get_all_checks() if not c.contract.id.startswith("C999")]
 
 
-def test_exact_77_checks_registered():
-    """Verify that exactly 77 production security checks are registered."""
-    prod_checks = _get_production_77_checks()
-    assert len(prod_checks) == 77, f"Expected 77 checks registered, got {len(prod_checks)}"
+def test_exact_86_checks_registered():
+    """Verify that exactly 86 production security checks are registered."""
+    prod_checks = _get_production_checks()
+    assert len(prod_checks) == 86, f"Expected 86 checks registered, got {len(prod_checks)}"
 
 
-def test_all_77_check_ids_sequential():
-    """Verify check IDs span sequentially from C001 to C077."""
-    prod_checks = _get_production_77_checks()
+def test_all_86_check_ids_sequential():
+    """Verify check IDs span sequentially from C001 to C086."""
+    prod_checks = _get_production_checks()
     check_ids = sorted([c.contract.id for c in prod_checks])
 
-    for i in range(1, 78):
+    for i in range(1, 87):
         expected_prefix = f"C{i:03d}_"
         matching = [cid for cid in check_ids if cid.startswith(expected_prefix)]
         assert len(matching) == 1, f"Missing or duplicate check for prefix {expected_prefix}: {matching}"
 
 
-def test_all_77_contracts_valid():
+def test_all_86_contracts_valid():
     """Verify all contracts have non-empty metadata fields."""
-    prod_checks = _get_production_77_checks()
+    prod_checks = _get_production_checks()
     for check_cls in prod_checks:
         contract = check_cls.contract
         check_id = contract.id
@@ -60,23 +60,24 @@ def test_all_77_contracts_valid():
         assert isinstance(contract.required_evidence, list), f"{check_id} missing required_evidence"
 
 
-def test_all_7_categories_populated():
-    """Verify all 7 OWASP vulnerability categories contain their expected check counts."""
-    prod_checks = _get_production_77_checks()
+def test_all_categories_populated():
+    """Verify all vulnerability categories contain their expected check counts."""
+    prod_checks = _get_production_checks()
     counts = {cat: len([c for c in prod_checks if c.contract.category == cat]) for cat in CheckCategory}
 
     assert counts[CheckCategory.RECON] == 11, f"Expected 11 RECON checks, got {counts[CheckCategory.RECON]}"
-    assert counts[CheckCategory.AUTH] == 11, f"Expected 11 AUTH checks, got {counts[CheckCategory.AUTH]}"
-    assert counts[CheckCategory.INJECTION] == 14, f"Expected 14 INJECTION checks, got {counts[CheckCategory.INJECTION]}"
+    assert counts[CheckCategory.AUTH] == 15, f"Expected 15 AUTH checks, got {counts[CheckCategory.AUTH]}"
+    assert counts[CheckCategory.INJECTION] == 16, f"Expected 16 INJECTION checks, got {counts[CheckCategory.INJECTION]}"
     assert counts[CheckCategory.XSS] == 10, f"Expected 10 XSS checks, got {counts[CheckCategory.XSS]}"
-    assert counts[CheckCategory.MISCONFIG] == 10, f"Expected 10 MISCONFIG checks, got {counts[CheckCategory.MISCONFIG]}"
+    assert counts[CheckCategory.MISCONFIG] == 11, f"Expected 11 MISCONFIG checks, got {counts[CheckCategory.MISCONFIG]}"
     assert counts[CheckCategory.SENSITIVE_DATA] == 10, f"Expected 10 SENSITIVE_DATA checks, got {counts[CheckCategory.SENSITIVE_DATA]}"
     assert counts[CheckCategory.BUSINESS_LOGIC] == 11, f"Expected 11 BUSINESS_LOGIC checks, got {counts[CheckCategory.BUSINESS_LOGIC]}"
+    assert counts[CheckCategory.INFRASTRUCTURE] == 2, f"Expected 2 INFRASTRUCTURE checks, got {counts[CheckCategory.INFRASTRUCTURE]}"
 
 
 def test_verification_strategy_mapping_completeness():
     """Verify every registered check has a resolvable verification strategy."""
-    prod_checks = _get_production_77_checks()
+    prod_checks = _get_production_checks()
     for check_cls in prod_checks:
         check_id = check_cls.contract.id
         strategy_name = check_cls.contract.verification_strategy

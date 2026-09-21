@@ -2,6 +2,12 @@ import asyncio
 import json
 import base64
 from datetime import datetime, timezone
+import sys
+sys.path.insert(0, ".")
+
+# Auto-clean port 5005 before anything else
+from scratch.kill_scratch_ports import kill as kill_ports
+kill_ports([5005])
 
 from backend.services.vulnerability_execution_engine import VulnerabilityExecutionEngine, VulnerabilityHypothesis, ExecutionMode, FindingStatus
 from backend.services.verification_engine import VerificationEngine

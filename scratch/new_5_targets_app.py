@@ -13,6 +13,35 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
+# 0. Index / Navigation Hub
+@app.route('/')
+def index():
+    return """<!DOCTYPE html>
+<html>
+<head><title>Vulnerable Target Portal</title></head>
+<body>
+    <h1>Application Portal</h1>
+    <nav>
+        <ul>
+            <li><a href="/login">Login Page</a></li>
+            <li><a href="/admin">Admin Console</a></li>
+            <li><a href="/transfer">Funds Transfer</a></li>
+            <li><a href="/upload">File Upload Service</a></li>
+            <li><a href="/parse-xml">XML Processing Service</a></li>
+            <li><a href="/files/">Public Static Files</a></li>
+            <li><a href="/api/data">API Data Endpoint</a></li>
+            <li><a href="/error-page">System Diagnostics / Error Page</a></li>
+        </ul>
+    </nav>
+    <form action="/transfer" method="POST">
+        <input type="text" name="amount" value="100"/>
+        <input type="text" name="to_account" value="attacker"/>
+        <button type="submit">Transfer</button>
+    </form>
+</body>
+</html>"""
+
+
 # 1. CSRF (Vulnerable by design: state changing POST without token)
 @app.route('/transfer', methods=['POST'])
 def transfer():

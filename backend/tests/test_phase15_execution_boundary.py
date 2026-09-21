@@ -154,7 +154,7 @@ def ops(repo):
 def test_check_registry_inventory_integrity():
     """Verify that all active checks in the repository are properly registered and conform to BaseCheck."""
     all_checks = registry.get_all_checks()
-    assert len(all_checks) == 77, f"Expected 77 checks, found {len(all_checks)}"
+    assert len(all_checks) == 86, f"Expected 86 checks, found {len(all_checks)}"
 
     seen_ids: Set[str] = set()
     for check_cls in all_checks:
@@ -198,7 +198,7 @@ def test_static_network_bypass_scan_all_checks():
 
     violations = []
     py_files = list(checks_dir.glob("c*.py"))
-    assert len(py_files) == 77, f"Expected 77 check source files, found {len(py_files)}"
+    assert len(py_files) == 86, f"Expected 86 check source files, found {len(py_files)}"
 
     for py_path in py_files:
         with open(py_path, "r", encoding="utf-8") as f:
@@ -257,7 +257,7 @@ async def test_request_engine_sentinel_all_77_checks():
         # Confirm zero public external calls attempted
         assert sentinel_transport.external_network_attempts == 0, f"Check {check_cls.contract.id} attempted external request!"
 
-    assert total_checks_executed == 77
+    assert total_checks_executed == 86
     assert checks_with_requests >= 60  # Vast majority of checks make active HTTP probe requests
 
 

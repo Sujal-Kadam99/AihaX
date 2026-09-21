@@ -94,6 +94,7 @@ class CapabilityClass(str, Enum):
 
 # Dangerous argument pattern detection (shell injection, chaining, redirection)
 DANGEROUS_ARG_PATTERN = re.compile(r"([;&|><`$\n\r]|\b(exec|eval|system|bash|sh|cmd|powershell)\b)", re.IGNORECASE)
+DANGEROUS_HEADER_PATTERN = re.compile(r"([&|><`$\n\r]|\b(exec|eval|system|bash|sh|cmd|powershell)\b)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -232,7 +233,7 @@ ALLOWED_TOOLS: Dict[str, ToolDefinition] = {
         requires_authorization=True,
         default_timeout=120,
         max_timeout=240,
-        allowed_flags={"-u", "-silent", "-jc", "-d", "-duc", "-timeout", "-c", "-j", "-jsonl"},
+        allowed_flags={"-u", "-silent", "-jc", "-d", "-duc", "-timeout", "-c", "-j", "-jsonl", "-H", "-fx", "-cos", "-form-extraction", "-crawl-out-scope"},
     ),
 }
 
@@ -470,14 +471,20 @@ class ToolExecutionBoundary:
     ) -> Tuple[List[str], Optional[str]]:
         """Validate argument list against allowed flags and reject dangerous characters."""
         sanitized: List[str] = []
-        for arg in args:
+        for i, arg in enumerate(args):
             if not isinstance(arg, str):
                 return [], f"Non-string argument provided: {arg}"
 
             arg_str = arg.strip()
 
             # Reject shell operators, metacharacters, or command chaining
-            if DANGEROUS_ARG_PATTERN.search(arg_str):
+            # Header values (e.g. following -H or starting with Cookie:, Authorization:, etc.) allow semicolons for cookie separation
+            is_header_val = (
+                arg_str.startswith(("Cookie:", "Authorization:", "User-Agent:", "X-"))
+                or (i > 0 and args[i - 1] in ("-H", "--header", "-header"))
+            )
+            pattern = DANGEROUS_HEADER_PATTERN if is_header_val else DANGEROUS_ARG_PATTERN
+            if pattern.search(arg_str):
                 return [], f"Dangerous shell metacharacter or command detected in argument: '{arg_str}'"
 
             # Secret redaction for argument logging/persistence

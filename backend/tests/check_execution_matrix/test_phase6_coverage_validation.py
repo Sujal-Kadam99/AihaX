@@ -33,21 +33,21 @@ from backend.models.database import Finding
 # 1. Registry Completeness Tests
 # ──────────────────────────────────────────────────────────────────────────────
 
-def test_registry_has_exactly_77_checks():
-    """Registry must contain exactly 77 checks."""
+def test_registry_has_exactly_86_checks():
+    """Registry must contain exactly 86 checks."""
     contracts = registry.list_checks()
-    assert len(contracts) == 77, (
-        f"Expected exactly 77 checks, got {len(contracts)}. "
+    assert len(contracts) == 86, (
+        f"Expected exactly 86 checks, got {len(contracts)}. "
         f"IDs: {sorted(c.id for c in contracts)}"
     )
 
 
 def test_validate_registry_completeness_passes():
-    """CoverageValidator.validate_registry_completeness must pass for 77 checks."""
-    result = CoverageValidator.validate_registry_completeness(expected_count=77)
+    """CoverageValidator.validate_registry_completeness must pass for 86 checks."""
+    result = CoverageValidator.validate_registry_completeness(expected_count=86)
     assert result["all_valid"] is True
     assert result["count_matches"] is True
-    assert result["actual_count"] == 77
+    assert result["actual_count"] == 86
     assert result["duplicate_ids"] == []
     assert result["invalid_contracts"] == []
 
@@ -102,12 +102,12 @@ def test_all_77_checks_have_non_empty_required_capabilities():
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_build_registry_matrix_returns_correct_totals():
-    """Static registry matrix must correctly reflect 77 checks."""
+    """Static registry matrix must correctly reflect 86 checks."""
     matrix = CoverageValidator.build_registry_matrix()
-    assert matrix["total_registered"] == 77
-    # Sum across all categories must == 77
+    assert matrix["total_registered"] == 86
+    # Sum across all categories must == 86
     total_by_cat = sum(len(v) for v in matrix["by_category"].values())
-    assert total_by_cat == 77
+    assert total_by_cat == 86
 
 
 def test_build_registry_matrix_browser_auth_workflow_counts():
@@ -185,11 +185,11 @@ def test_build_coverage_report_empty_audit_trail():
     result = _make_campaign_result(audit_trail=[])
     report = CoverageValidator.build_coverage_report(result)
 
-    assert report.total_registered_checks == 77
+    assert report.total_registered_checks == 86
     assert report.checks_executed == 0
     assert report.checks_with_candidates == 0
     # All checks are either skipped (prereq) or unreached
-    assert report.checks_skipped_prerequisite + report.checks_planned_unreached == 77
+    assert report.checks_skipped_prerequisite + report.checks_planned_unreached == 86
 
 
 def test_build_coverage_report_with_executed_checks():
@@ -306,7 +306,7 @@ def test_build_coverage_report_to_dict_structure():
     assert "coverage_percentage" in summary
     assert "reachable_percentage" in summary
 
-    assert len(d["records"]) == 77
+    assert len(d["records"]) == 86
 
 
 def test_build_coverage_report_to_json_is_valid():
@@ -316,7 +316,7 @@ def test_build_coverage_report_to_json_is_valid():
     report = CoverageValidator.build_coverage_report(result)
     raw_json = report.to_json()
     parsed = json.loads(raw_json)
-    assert parsed["summary"]["total_registered_checks"] == 77
+    assert parsed["summary"]["total_registered_checks"] == 86
 
 
 def test_coverage_report_assert_minimum_coverage_fails_when_none_executed():
@@ -407,12 +407,12 @@ def test_check_coverage_record_to_dict():
     assert d["produced_candidate"] is False
 
 
-def test_build_coverage_report_records_all_77_in_sorted_order():
-    """Coverage report records must contain exactly 77 checks in sorted order."""
+def test_build_coverage_report_records_all_86_in_sorted_order():
+    """Coverage report records must contain exactly 86 checks in sorted order."""
     result = _make_campaign_result(audit_trail=[])
     report = CoverageValidator.build_coverage_report(result)
 
-    assert len(report.records) == 77
+    assert len(report.records) == 86
     # Verify sorted order
     ids = [r.check_id for r in report.records]
     assert ids == sorted(ids)

@@ -268,11 +268,11 @@ class TestSeverityConfidenceIndependence:
 class TestRegistryIntegrity:
 
     def test_77_checks_registered(self):
-        """The registry must have exactly 77 checks."""
+        """The registry must have exactly 86 checks."""
         import backend.agents.checks  # Ensure all checks are registered
         from backend.core.check_registry import registry
         count = len(registry.list_checks())
-        assert count == 77, f"Expected 77 checks, got {count}"
+        assert count == 86, f"Expected 86 checks, got {count}"
 
     def test_no_hardcoded_verified_in_checks(self):
         """No check module should hardcode 'VERIFIED' or 'REPORTABLE' verdicts."""

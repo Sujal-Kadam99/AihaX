@@ -135,6 +135,8 @@ class ReconExecutionConfig:
     timeout_per_tool: int = 60
     allow_loopback: bool = False
     wordlist_path: Path = field(default_factory=lambda: _DEFAULT_WORDLIST)
+    auth_headers: Dict[str, str] = field(default_factory=dict)
+    auth_cookies: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -530,13 +532,14 @@ class ReconAgent(BaseAgent):
 
             # Katana (Active Crawler)
             if config.enable_active_crawler and config.authorization_confirmed:
+                katana_args = ["-u", target_url, "-duc", "-silent", "-d", "2", "-timeout", "3", "-c", "5", "-j", "-fx"]
                 katana_res = await self.tool_boundary.execute(
                     ToolExecutionRequest(
                         campaign_id=config.campaign_id,
                         target=target_url,
                         tool_name="katana",
                         execution_profile=ExecutionProfile.URL_DISCOVERY.value,
-                        args=["-u", target_url, "-duc", "-silent", "-d", "2", "-timeout", "3", "-c", "5"],
+                        args=katana_args,
                         timeout_seconds=config.timeout_per_tool * 2,
                         authorization_confirmed=config.authorization_confirmed,
                         execution_mode=config.execution_mode,
@@ -548,24 +551,7 @@ class ReconAgent(BaseAgent):
                 )
                 tool_results["katana"] = katana_res.to_dict()
                 if katana_res.execution_status == ToolExecutionStatus.SUCCESS.value and katana_res.stdout:
-                    import json
-                    for line in katana_res.stdout.splitlines()[:500]:
-                        try:
-                            data = json.loads(line)
-                            url = data.get("request", {}).get("endpoint") or data.get("endpoint") or line.strip()
-                        except:
-                            url = line.strip()
-                        if url and url.startswith("http"):
-                            canon = canonicalize_url(url)
-                            raw_observations.append(
-                                ReconObservation(
-                                    category=ReconObservationCategory.ENDPOINT.value,
-                                    value=url,
-                                    normalized_value=canon,
-                                    discovered_by=["katana"],
-                                    evidence_hash=katana_res.stdout_hash,
-                                )
-                            )
+                    self._parse_katana_output(katana_res.stdout, raw_observations, katana_res.stdout_hash, source_tag="katana")
 
         # 7. Technology Fingerprinting (WhatWeb)
         if config.enable_tech_detection:
@@ -653,13 +639,16 @@ class ReconAgent(BaseAgent):
         if config.enable_tls_analysis and parsed_target.scheme == "https":
             self._analyze_tls(domain, port, raw_observations)
 
-        # 12. Deduplication & Provenance Aggregation
+        # 12. Parameter Seed Fallback for discovered endpoints
+        raw_observations.extend(self._seed_parameter_fallback(raw_observations, config.target_url))
+
+        # 13. Deduplication & Provenance Aggregation
         deduped_observations = self._deduplicate_observations(raw_observations)
 
-        # 13. Attack Surface Graph Integration
+        # 14. Attack Surface Graph Integration
         graph_snapshot = self._populate_attack_surface_graph(AttackSurfaceGraphEngine, deduped_observations, config, db)
 
-        # 14. Determine Pipeline Status
+        # 15. Determine Pipeline Status
         pipeline_status = self._resolve_pipeline_status(tool_results, config.authorization_confirmed)
 
         return self._build_snapshot(
@@ -673,9 +662,292 @@ class ReconAgent(BaseAgent):
             started_at=started_at,
         )
 
+    async def run_authenticated_pass(
+        self,
+        shared_auth_context: Any,
+        db: Optional[Session] = None,
+    ) -> Optional[ReconSnapshot]:
+        """Execute a second, authenticated reconnaissance crawl pass and merge results."""
+        if not shared_auth_context:
+            return self.recon_snapshot
+
+        target_url = self.config.get("target_url") or self.config.get("target", "")
+        if not target_url:
+            return self.recon_snapshot
+
+        # Extract account 1 or 2 context
+        account_contexts = getattr(shared_auth_context, "account_contexts", {})
+        auth_ctx = account_contexts.get(1) or account_contexts.get(2)
+        if not auth_ctx:
+            return self.recon_snapshot
+
+        cookies = getattr(auth_ctx, "_cookies", [])
+        headers = getattr(auth_ctx, "_headers", {})
+        bearer_token = getattr(auth_ctx, "_bearer_token", None)
+
+        cookie_str = ""
+        if cookies:
+            cookie_parts = []
+            for c in cookies:
+                if isinstance(c, dict) and "name" in c and "value" in c:
+                    cookie_parts.append(f"{c['name']}={c['value']}")
+            cookie_str = "; ".join(cookie_parts)
+
+        katana_args = [
+            "-u", target_url,
+            "-duc",
+            "-silent",
+            "-d", "2",
+            "-timeout", "3",
+            "-c", "5",
+            "-j",
+            "-fx",
+            "-cos", ".*logout.*",
+        ]
+
+        if cookie_str:
+            katana_args.extend(["-H", f"Cookie: {cookie_str}"])
+
+        if bearer_token:
+            katana_args.extend(["-H", f"Authorization: Bearer {bearer_token}"])
+        elif headers.get("Authorization"):
+            katana_args.extend(["-H", f"Authorization: {headers['Authorization']}"])
+
+        for k, v in headers.items():
+            if k.lower() not in ("authorization", "cookie"):
+                katana_args.extend(["-H", f"{k}: {v}"])
+
+        in_scope = self.config.get("in_scope_assets", [target_url])
+        exec_mode = str(self.config.get("execution_mode", "AUTHORIZED_LIVE_RECON" if bool(self.config.get("authorization_confirmed", True)) else "AUDIT"))
+        katana_res = await self.tool_boundary.execute(
+            ToolExecutionRequest(
+                campaign_id=self.scan_id,
+                target=target_url,
+                tool_name="katana",
+                execution_profile=ExecutionProfile.URL_DISCOVERY.value,
+                args=katana_args,
+                timeout_seconds=int(self.config.get("timeout_per_tool", 60)) * 2,
+                authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+                execution_mode=exec_mode,
+                in_scope_assets=in_scope,
+                out_of_scope_assets=self.config.get("out_of_scope_assets", []),
+                allow_loopback=bool(self.config.get("allow_loopback", False)),
+            ),
+            db=db or self.db,
+        )
+
+        new_observations: List[ReconObservation] = []
+        if katana_res.execution_status == ToolExecutionStatus.SUCCESS.value and katana_res.stdout:
+            self._parse_katana_output(
+                katana_res.stdout,
+                new_observations,
+                katana_res.stdout_hash,
+                source_tag="katana_auth",
+            )
+
+        logger.info(f"Authenticated recon pass discovered {len(new_observations)} new observations")
+
+        # Merge observations into current snapshot
+        base_observations = list(self.recon_snapshot.observations) if self.recon_snapshot else []
+        all_observations = base_observations + new_observations
+        all_observations.extend(self._seed_parameter_fallback(all_observations, target_url))
+        deduped_observations = self._deduplicate_observations(all_observations)
+
+        # Re-populate Attack Surface Graph
+        recon_cfg = ReconExecutionConfig(
+            campaign_id=self.scan_id,
+            target_url=target_url,
+            allow_loopback=bool(self.config.get("allow_loopback", False)),
+            authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+            execution_mode=exec_mode,
+        )
+        graph_snapshot = self._populate_attack_surface_graph(
+            AttackSurfaceGraphEngine, deduped_observations, recon_cfg, db or self.db
+        )
+
+        tool_results = dict(self.recon_snapshot.tool_results) if self.recon_snapshot else {}
+        tool_results["katana_auth"] = katana_res.to_dict()
+
+        warnings = list(self.recon_snapshot.warnings) if self.recon_snapshot else []
+        errors = list(self.recon_snapshot.errors) if self.recon_snapshot else []
+        started_at = self.recon_snapshot.started_at if self.recon_snapshot else get_utc_now().isoformat()
+        status = self.recon_snapshot.status if self.recon_snapshot else ReconPipelineStatus.COMPLETED.value
+
+        self.recon_snapshot = self._build_snapshot(
+            config=recon_cfg,
+            status=status,
+            observations=deduped_observations,
+            tool_results=tool_results,
+            graph_snapshot=graph_snapshot,
+            warnings=warnings,
+            errors=errors,
+            started_at=started_at,
+        )
+
+        # Update Redis attack surface cache
+        try:
+            await set_attack_surface(self.scan_id, self.recon_snapshot.to_dict())
+        except Exception:
+            pass
+
+        # Persist updated snapshot log to db
+        if db or self.db:
+            try:
+                from backend.models.database import AgentLog
+                active_db = db or self.db
+                active_db.add(
+                    AgentLog(
+                        scan_id=self.scan_id,
+                        agent_id=1,
+                        message=json.dumps(self.recon_snapshot.to_dict()),
+                        level="INFO",
+                    )
+                )
+                active_db.commit()
+            except Exception:
+                pass
+
+        return self.recon_snapshot
+
     # ==========================================================================
     # Parsing, Normalization & Graph Integration Helpers
     # ==========================================================================
+
+    def _seed_parameter_fallback(self, observations: List[ReconObservation], base_target: str) -> List[ReconObservation]:
+        """Seed candidate parameters for endpoints (e.g. /vulnerabilities/) lacking discovered parameters."""
+        seeded: List[ReconObservation] = []
+        
+        endpoints = [
+            o for o in observations
+            if o.category in (
+                ReconObservationCategory.ENDPOINT.value,
+                ReconObservationCategory.DIRECTORY.value,
+                ReconObservationCategory.HISTORICAL_URL.value,
+            )
+        ]
+        
+        common_candidates = ["id", "name", "ip", "query", "search", "page", "user", "email"]
+        
+        for ep_obs in endpoints:
+            ep_url = ep_obs.normalized_value
+            ep_lower = ep_url.lower()
+            
+            # Target endpoints matching /vulnerabilities/ or interactive web paths
+            if "/vulnerabilities/" in ep_lower or "/api/" in ep_lower:
+                subpath_params = []
+                if "sqli" in ep_lower:
+                    subpath_params = ["id", "user", "cat"]
+                elif "xss" in ep_lower:
+                    subpath_params = ["name", "query", "msg"]
+                elif "exec" in ep_lower:
+                    subpath_params = ["ip", "cmd"]
+                elif "fi" in ep_lower:
+                    subpath_params = ["page", "file"]
+                elif "brute" in ep_lower:
+                    subpath_params = ["username", "password"]
+                else:
+                    subpath_params = common_candidates[:4]
+                    
+                for param in subpath_params:
+                    seeded.append(
+                        ReconObservation(
+                            category=ReconObservationCategory.PARAMETER.value,
+                            value=param,
+                            normalized_value=param.lower(),
+                            discovered_by=["parameter_seed_fallback"],
+                            metadata={"endpoint": ep_url, "source": "parameter_seed_fallback"},
+                        )
+                    )
+        return seeded
+
+    def _parse_katana_output(
+        self,
+        stdout: str,
+        obs_list: List[ReconObservation],
+        evidence_hash: Optional[str],
+        source_tag: str = "katana",
+    ) -> None:
+        """Parse Katana JSON/JSONL output, extracting endpoints, query parameters, and form inputs."""
+        for line in stdout.splitlines()[:1000]:
+            line_s = line.strip()
+            if not line_s:
+                continue
+            data: Dict[str, Any] = {}
+            try:
+                data = json.loads(line_s)
+                req = data.get("request", {}) if isinstance(data, dict) else {}
+                url = req.get("endpoint") or (data.get("endpoint") if isinstance(data, dict) else "") or line_s
+            except Exception:
+                url = line_s
+
+            if url and isinstance(url, str) and url.startswith("http"):
+                canon = canonicalize_url(url)
+                obs_list.append(
+                    ReconObservation(
+                        category=ReconObservationCategory.ENDPOINT.value,
+                        value=url,
+                        normalized_value=canon,
+                        discovered_by=[source_tag],
+                        evidence_hash=evidence_hash,
+                    )
+                )
+
+                # Extract query parameters from URL
+                try:
+                    parsed = urlparse(url)
+                    if parsed.query:
+                        q_dict = parse_qs(parsed.query, keep_blank_values=True)
+                        for param_name in q_dict.keys():
+                            p_clean = param_name.strip()
+                            if p_clean:
+                                obs_list.append(
+                                    ReconObservation(
+                                        category=ReconObservationCategory.PARAMETER.value,
+                                        value=p_clean,
+                                        normalized_value=p_clean.lower(),
+                                        discovered_by=[source_tag],
+                                        metadata={"source": "query_param", "endpoint": canon},
+                                        evidence_hash=evidence_hash,
+                                    )
+                                )
+                except Exception:
+                    pass
+
+            # Extract form inputs if form extraction was enabled (-fx)
+            if isinstance(data, dict):
+                req = data.get("request", {}) if isinstance(data.get("request"), dict) else {}
+                form_data = data.get("form") or data.get("forms") or req.get("form") or req.get("forms")
+                forms = [form_data] if isinstance(form_data, dict) else (form_data if isinstance(form_data, list) else [])
+                for f in forms:
+                    if isinstance(f, dict):
+                        fields = f.get("fields") or f.get("parameters") or f.get("inputs") or []
+                        if isinstance(fields, list):
+                            for fld in fields:
+                                fname = fld.get("name") if isinstance(fld, dict) else (str(fld) if fld else "")
+                                if fname and fname.strip():
+                                    obs_list.append(
+                                        ReconObservation(
+                                            category=ReconObservationCategory.PARAMETER.value,
+                                            value=fname.strip(),
+                                            normalized_value=fname.strip().lower(),
+                                            discovered_by=[source_tag],
+                                            metadata={"source": "form_field", "endpoint": canon},
+                                            evidence_hash=evidence_hash,
+                                        )
+                                    )
+                        elif isinstance(fields, dict):
+                            for fname in fields.keys():
+                                if fname and fname.strip():
+                                    obs_list.append(
+                                        ReconObservation(
+                                            category=ReconObservationCategory.PARAMETER.value,
+                                            value=fname.strip(),
+                                            normalized_value=fname.strip().lower(),
+                                            discovered_by=[source_tag],
+                                            metadata={"source": "form_field", "endpoint": canon},
+                                            evidence_hash=evidence_hash,
+                                        )
+                                    )
 
     def _parse_whatweb_output(self, stdout: str, obs_list: List[ReconObservation], evidence_hash: Optional[str]) -> None:
         """Parse WhatWeb JSON output into technology observations."""
@@ -868,6 +1140,23 @@ class ReconAgent(BaseAgent):
                                 db=db,
                             )
                             edges.append(p_edge)
+                except Exception:
+                    pass
+            elif obs.category == ReconObservationCategory.PARAMETER.value:
+                try:
+                    p_name = obs.value
+                    ep_path = obs.metadata.get("endpoint") or "/"
+                    if ep_path.startswith("http"):
+                        ep_path = urlparse(ep_path).path or "/"
+                    p_node = engine.add_parameter(
+                        campaign_id=config.campaign_id,
+                        target=config.target_url,
+                        endpoint=ep_path,
+                        parameter=p_name,
+                        source=",".join(obs.discovered_by),
+                        db=db,
+                    )
+                    nodes.append(p_node)
                 except Exception:
                     pass
 
