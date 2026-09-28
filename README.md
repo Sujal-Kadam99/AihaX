@@ -1,32 +1,85 @@
 # AihaX
 
-**Enter URL. Click Start. Get a Professional Pentest Report.**
+AI-powered application security testing and verification platform for web apps, APIs, and exposed attack surfaces.
 
-AihaX is an AI-powered automated penetration testing platform that runs a 9-agent pipeline to perform end-to-end web application security testing — from reconnaissance to professional PDF reports — with no manual intervention after clicking START.
+AihaX combines reconnaissance, deterministic vulnerability checks, verification strategies, and reporting into a single security workflow designed for real-world testing with strong guardrails and false-positive controls.
+
+## Latest updates
+
+The project has recently expanded from a basic prototype into a production-style security engine with:
+
+- 77 deterministic vulnerability checks across 7 OWASP-aligned categories
+- batch verification coverage for C/D class checks, including C078-C086 and expanded hypothesis logic
+- 30 verification strategies for reducing false positives and validating real exploitation paths
+- stronger recon capabilities with app/API wordlists, Katana crawling support, and live recon mode
+- hardened execution pipeline with safer tool resolution, allow_loopback handling, and report fallbacks
+- repository cleanup to remove large binaries and reduce noisy artifacts
+
+## Core capabilities
+
+### Deterministic security checks
+AihaX includes a full catalog of production checks covering:
+
+- recon and asset exposure
+- authentication and session weaknesses
+- injection and parser issues
+- XSS and client-side abuse
+- configuration and hardening gaps
+- data exposure and sensitive file leakage
+- business logic and access-control flaws
+
+The implementation is documented in `docs/checks/README.md` and the check catalog under `docs/checks/`.
+
+### Verification engine
+Each candidate issue is passed through a multi-layer verification pipeline designed to reject generic HTTP errors and weak signals. This includes:
+
+- deterministic exploit and validation probes
+- differential analysis against expected safe behavior
+- evidence capture for verified findings
+- false-positive controls based on status codes, headers, and response signatures
+
+### Recon and live testing
+Recent updates include:
+
+- app/API wordlist expansion for broader discovery
+- Katana crawler integration for deeper surface mapping
+- project-local tool resolution for internal binaries and support utilities
+- live recon mode and safer pass-through execution
 
 ## Architecture
 
+```text
+Target / Asset
+  -> Scope validation and request budget controls
+  -> Request engine / transport layer
+  -> Recon and discovery agents
+  -> Deterministic vulnerability checks
+  -> Verification and differential validation
+  -> Evidence capture and report generation
 ```
-[Electron Shell]  →  localhost:3000 (React)
-        ↓
-[Docker Container]
-  ├── FastAPI backend (localhost:8000)
-  ├── Redis (agent memory + pub/sub)
-  ├── ChromaDB (long-term learning)
-  ├── SQLite (scan history)
-  └── Pentest tools (Nmap, SQLMap, Nuclei, Dalfox, Playwright, ...)
+
+## Repository structure
+
+```text
+AihaX/
+├── backend/              # API and scanning orchestration
+├── docker/                # container setup and runtime config
+├── docs/                  # security check catalog and implementation docs
+├── electron/              # desktop shell (if present in your checkout)
+├── frontend/              # UI and dashboard
+├── bin/                   # bundled tool dependencies and helper binaries
+├── templates/             # report templates
+├── wordlists/             # target discovery and recon wordlists
+├── README.md              # project overview
+├── .gitignore             # local/runtime exclusions
+├── requirements*.txt      # Python dependencies
+├── package*.json          # frontend/electron dependencies
+└── ...
 ```
 
-## Prerequisites
+## Quick start
 
-- **Windows 10/11** (64-bit) — macOS support planned for v1.1
-- **Docker Desktop 25+** — must be installed and running
-- **Node.js 18+** — for Electron and React development
-- **Python 3.11+** — optional, for local backend development outside Docker
-
-## Quick Start (Development)
-
-### 1. Start the backend (Docker)
+### Docker backend
 
 ```powershell
 cd docker
@@ -36,9 +89,13 @@ $env:AIHAX_CONFIG = "$env:USERPROFILE\AihaX\config"
 docker-compose up -d --build
 ```
 
-Verify health: `curl http://localhost:8000/api/health`
+Verify health:
 
-### 2. Start the frontend
+```bash
+curl http://localhost:8000/api/health
+```
+
+### Frontend
 
 ```powershell
 cd frontend
@@ -46,9 +103,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open the app at http://localhost:3000
 
-### 3. Start Electron (optional — full desktop experience)
+### Optional desktop app
 
 ```powershell
 cd electron
@@ -56,76 +113,22 @@ npm install
 npm run dev
 ```
 
-## Project Structure
+## Security and governance
 
-```
-aihax/
-├── electron/          # Electron desktop shell
-├── frontend/          # React + Tailwind UI
-├── backend/           # FastAPI + 9-agent pipeline
-│   ├── agents/        # Recon, Auth, Vuln, Verify, Learning, Report, Remediation, Impact, BugBounty
-│   ├── core/          # Config, encryption, Redis, ChromaDB
-│   ├── models/        # SQLAlchemy ORM + Pydantic schemas
-│   ├── routers/       # REST API endpoints
-│   └── services/      # Scan orchestrator
-├── docker/            # Dockerfile + docker-compose
-└── templates/         # Jinja2 report templates
-```
+AihaX is designed for authorized security testing only. Every scan should be scoped to assets you own or explicitly have permission to assess.
 
-## 9-Agent Pipeline
+## Recent feature highlights
 
-| Agent | Name | Purpose |
-|-------|------|---------|
-| 1 | Recon | Subdomain discovery, port scan, tech stack detection |
-| 2 | Authentication | Playwright login + 2FA handling |
-| 3 | Vulnerability Testing | 15 MVP vulns (expanding to 77) |
-| 4 | Verification | False positive elimination |
-| 5 | Learning | Redis + ChromaDB pattern storage |
-| 6 | Report Generation | WeasyPrint PDF output |
-| 7 | Remediation | Claude API framework-specific fixes |
-| 8 | Business Impact | Claude API risk assessment |
-| 9 | Bug Bounty Export | HackerOne/Bugcrowd format (optional) |
+- Batch C/D checks and broader coverage for exploit verification
+- real-target validation and safeguard logic for high-risk checks
+- recon pipeline hardening and safer tool execution
+- removal of large tracked binaries to keep the repository lighter and cleaner
+- improved detection coverage for default credentials, directory listings, verbose errors, and transport issues
 
-## API Endpoints
+## Notes
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/scan/start` | Start new scan |
-| GET | `/api/scan/{id}` | Scan status + agent states |
-| DELETE | `/api/scan/{id}` | Cancel scan |
-| GET | `/api/scan/history/list` | Past scans |
-| GET | `/api/findings/{id}` | Get findings |
-| GET | `/api/report/{id}` | Download PDF |
-| POST | `/api/settings` | Save API keys |
-| WS | `/ws/{id}` | Real-time updates |
-
-## Configuration
-
-API keys are stored encrypted at `~/AihaX/config/vault.enc` using AES-256-GCM with a machine-specific key. Configure in the Settings screen:
-
-- **Claude API Key** — required for Agents 7 & 8 (remediation + business impact)
-- **Shodan API Key** — optional, enhances recon
-- **VirusTotal API Key** — optional, threat intel
-- **Twilio** — required only for SMS OTP 2FA
-
-## Reports
-
-PDF reports are saved to `~/AihaX/Reports/{scan_id}.pdf` via Docker volume mount.
-
-## Development Phases
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| 0 | ✅ Complete | Project scaffold + Docker |
-| 1 | ✅ Complete | FastAPI + Electron shell + React UI |
-| 2 | 🔲 Next | Config panel validation + Auth agent hardening |
-| 3–12 | 🔲 Planned | See planning documents |
-
-## Security Notice
-
-AihaX is a penetration testing tool. Only scan targets you own or have explicit written authorization to test. Unauthorized scanning may violate computer fraud laws.
+The repository has been actively evolving with a strong emphasis on deterministic verification and reducing false positives in real-world web and API assessments.
 
 ## License
 
-Proprietary — AihaX v1.0
+Proprietary project license (see repository policy and any included licensing files for details).
