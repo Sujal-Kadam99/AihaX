@@ -350,7 +350,7 @@ class TestLocalEndToEndScenario:
             authorization_confirmed=True,
             in_scope_assets=["https://authorized.local", "https://*.authorized.local"],
         )
-        assert matrix.total_registered == 77
+        assert matrix.total_registered == 86
         assert matrix.applicable_count > 0
         # Critical verification: select_tests produces applicability matrix without executing tests
         assert isinstance(matrix.get_executable_entries(), list)

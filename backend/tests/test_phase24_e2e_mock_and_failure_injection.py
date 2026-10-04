@@ -112,7 +112,7 @@ class TestEndToEndMockPipeline:
             shared_auth_context=auth_ctx,
             authorization_confirmed=True,
         )
-        assert matrix.total_registered == 77
+        assert matrix.total_registered == 86
         assert matrix.applicable_count > 0
 
         # 5. Hypothesis Generation

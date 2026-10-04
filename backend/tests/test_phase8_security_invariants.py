@@ -18,7 +18,7 @@ from backend.evidence.redaction import contains_unredacted_secrets, redact_secre
 def test_all_77_checks_registered_and_non_destructive():
     import backend.agents.checks  # Ensure checks registered
     checks = registry.list_checks()
-    assert len(checks) == 77, f"Expected 77 checks, got {len(checks)}"
+    assert len(checks) == 86, f"Expected 86 checks, got {len(checks)}"
 
     for c in checks:
         assert c.destructive is False, f"Check {c.id} must be non-destructive"

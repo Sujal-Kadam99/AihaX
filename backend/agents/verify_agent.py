@@ -1,5 +1,6 @@
 """Agent 4 — Deterministic Evidence-Based Verification Engine."""
 
+import logging
 from typing import Any, Optional
 
 from backend.agents.base_agent import BaseAgent
@@ -11,6 +12,8 @@ from backend.services.verification_engine import (
     VerificationEngine,
     VerificationStatus,
 )
+
+logger = logging.getLogger("aihax.verify_agent")
 
 
 class VerifyAgent(BaseAgent):
@@ -47,6 +50,7 @@ class VerifyAgent(BaseAgent):
         )
         engine = VerificationEngine()
         auth_confirmed = bool(self.config.get("authorization_confirmed", True))
+        auth_context = self._extract_auth_context()
 
         for i, finding in enumerate(findings):
             await self.check_cancelled()
@@ -59,6 +63,7 @@ class VerifyAgent(BaseAgent):
             conclusion = await engine.verify_finding(
                 finding=finding,
                 request_engine=request_engine,
+                auth_context=auth_context,
                 authorization_confirmed=auth_confirmed,
             )
 
@@ -85,14 +90,39 @@ class VerifyAgent(BaseAgent):
             "rejected": rejected,
         }
 
+    def _extract_auth_context(self) -> Optional[AuthenticationContext]:
+        import json as _json
+        from backend.models.database import AuthContextRecord
+        cookies: dict[str, str] = {}
+        try:
+            records = self.db.query(AuthContextRecord).filter_by(campaign_id=self.scan_id).all()
+            for rec in records:
+                if rec.metadata_json:
+                    meta = _json.loads(rec.metadata_json)
+                    rec_cookies = meta.get("cookies", {})
+                    if isinstance(rec_cookies, dict):
+                        cookies.update({str(k): str(v) for k, v in rec_cookies.items()})
+        except Exception as e:
+            logger.warning(f"Could not load auth cookies from DB: {e}")
+        if not cookies:
+            return None
+        return AuthenticationContext(
+            name="shared_authenticated_session",
+            auth_type="session_cookie",
+            cookies=cookies,
+            headers={},
+        )
+
     async def _run_verification_pipeline(self, finding: Finding) -> VerificationConclusion:
         """Legacy helper bridge for backward compatibility with unit tests."""
         target_url = finding.affected_url or "https://example.com"
         validator = ScopeValidator(in_scope_assets=[target_url])
         request_engine = RequestEngine(scope_validator=validator)
         engine = VerificationEngine()
+        auth_context = self._extract_auth_context()
         return await engine.verify_finding(
             finding=finding,
             request_engine=request_engine,
+            auth_context=auth_context,
             authorization_confirmed=True,
         )

@@ -395,55 +395,69 @@ class VerificationRegistry:
         "C013_Weak_Session_Cookie": "http_response_property",
         "C014_Missing_Secure_Cookie": "http_response_property",
         "C015_Missing_HttpOnly_Cookie": "http_response_property",
-        "C017_Session_Fixation": "generic_reproducibility",
+        "C017_Session_Fixation": "C017_Session_Fixation",
+        "session_fixation": "C017_Session_Fixation",
         "C018_Session_Invalidation": "authentication_comparison",
-        "C019_Password_Policy_Weakness": "generic_reproducibility",
+        "C019_Password_Policy_Weakness": "C019_Password_Policy_Weakness",
+        "password_policy": "C019_Password_Policy_Weakness",
         "C021_JWT_Claim_Validation": "C020_JWT_Algorithm_Weakness",
         "C022_Auth_Rate_Limit": "auth_rate_limit",
         "C022_AUTH_RATE_LIMIT": "auth_rate_limit",
         "C022_Authentication_Rate_Limit_Weakness": "auth_rate_limit",
         "Authentication Rate-Limit Weakness": "auth_rate_limit",
         "C024_Blind_SQL_Injection": "generic_reproducibility",
-        "C025_NoSQL_Injection": "generic_reproducibility",
+        "C025_NoSQL_Injection": "C025_NoSQL_Injection",
+        "nosql_injection": "C025_NoSQL_Injection",
         "C026_Command_Injection_Indicators": "C026_OS_Command_Injection",
         "C027_OS_Command_Injection": "C026_OS_Command_Injection",
-        "C028_SSTI": "generic_reproducibility",
+        "C028_SSTI": "C028_SSTI",
+        "ssti": "C028_SSTI",
         "C029_Header_Injection": "http_response_property",
         "C030_CRLF_Injection": "http_response_property",
-        "C031_Path_Traversal": "generic_reproducibility",
-        "C032_Local_File_Inclusion": "generic_reproducibility",
-        "C034_LDAP_Injection": "generic_reproducibility",
-        "C035_EL_Injection": "generic_reproducibility",
-        "C036_SSRF_Indicators": "generic_reproducibility",
-        "C037_Reflected_XSS": "generic_reproducibility",
-        "C038_Stored_XSS": "generic_reproducibility",
-        "C039_DOM_XSS_Indicators": "generic_reproducibility",
-        "C040_HTML_Context_Injection": "generic_reproducibility",
-        "C041_Attribute_Context_Injection": "generic_reproducibility",
-        "C042_JavaScript_Context_Injection": "generic_reproducibility",
-        "C043_URL_Context_Injection": "generic_reproducibility",
-        "C044_Mutation_XSS": "generic_reproducibility",
-        "C045_XSS_Filter_Bypass": "generic_reproducibility",
-        "C046_Unsafe_HTML_Rendering": "generic_reproducibility",
+        "C031_Path_Traversal": "C031_Path_Traversal",
+        "path_traversal": "C031_Path_Traversal",
+        "C032_Local_File_Inclusion": "C032_Local_File_Inclusion",
+        "lfi": "C032_Local_File_Inclusion",
+        "C034_LDAP_Injection": "C034_LDAP_Injection",
+        "ldap_injection": "C034_LDAP_Injection",
+        "C035_EL_Injection": "C035_EL_Injection",
+        "el_injection": "C035_EL_Injection",
+        "C036_SSRF_Indicators": "C036_SSRF_Indicators",
+        "ssrf": "C036_SSRF_Indicators",
+        "C037_Reflected_XSS": "C037_Reflected_XSS",
+        "C038_Stored_XSS": "C037_Reflected_XSS",
+        "C039_DOM_XSS_Indicators": "C037_Reflected_XSS",
+        "C040_HTML_Context_Injection": "C037_Reflected_XSS",
+        "C041_Attribute_Context_Injection": "C037_Reflected_XSS",
+        "C042_JavaScript_Context_Injection": "C037_Reflected_XSS",
+        "C043_URL_Context_Injection": "C037_Reflected_XSS",
+        "C044_Mutation_XSS": "C037_Reflected_XSS",
+        "C045_XSS_Filter_Bypass": "C037_Reflected_XSS",
+        "C046_Unsafe_HTML_Rendering": "C037_Reflected_XSS",
         "C047_Missing_CSP": "http_response_property",
         "C048_Weak_CSP": "http_response_property",
         "C049_Clickjacking": "http_response_property",
         "C050_MIME_Sniffing": "http_response_property",
-        "C051_Cross_Domain_Policy": "generic_reproducibility",
+        "C051_Cross_Domain_Policy": "C051_Cross_Domain_Policy",
+        "cross_domain_policy": "C051_Cross_Domain_Policy",
         "C052_Insecure_HTTP_Methods": "http_response_property",
         "C053_Default_Setup_Page": "sensitive_file_exposure",
         "C054_Verbose_Error_Disclosure": "generic_reproducibility",
-        "C056_Path_Normalization": "generic_reproducibility",
+        "C056_Path_Normalization": "C056_Path_Normalization",
+        "path_normalization": "C056_Path_Normalization",
         "C057_Exposed_API_Keys": "sensitive_file_exposure",
         "C058_Source_Map_Exposure": "sensitive_file_exposure",
         "C059_PII_URL_Exposure": "http_response_property",
-        "C060_Comment_Information_Disclosure": "generic_reproducibility",
+        "C060_Comment_Information_Disclosure": "C060_Comment_Information_Disclosure",
+        "comment_disclosure": "C060_Comment_Information_Disclosure",
         "C061_Backup_File_Exposure": "sensitive_file_exposure",
         "C062_Database_Dump_Exposure": "sensitive_file_exposure",
-        "C063_Cloud_Bucket_Exposure": "generic_reproducibility",
+        "C063_Cloud_Bucket_Exposure": "C063_Cloud_Bucket_Exposure",
+        "cloud_bucket": "C063_Cloud_Bucket_Exposure",
         "C064_Git_Metadata_Exposure": "sensitive_file_exposure",
         "C065_Unencrypted_Transmission": "transport_security",
-        "C066_Cleartext_Storage_Indicators": "generic_reproducibility",
+        "C066_Cleartext_Storage_Indicators": "C066_Cleartext_Storage_Indicators",
+        "cleartext_storage": "C066_Cleartext_Storage_Indicators",
         "C067_IDOR_Numeric_IDs": "authorization_comparison",
         "C068_IDOR_UUIDs": "authorization_comparison",
         "C069_BOLA_API": "authorization_comparison",
@@ -451,10 +465,30 @@ class VerificationRegistry:
         "C071_Privilege_Escalation": "authorization_comparison",
         "C072_Function_Access_Control": "authorization_comparison",
         "C073_Parameter_Tampering": "generic_reproducibility",
-        "C074_Workflow_Step_Skipping": "generic_reproducibility",
+        "C074_Workflow_Step_Skipping": "C074_Workflow_Step_Skipping",
+        "workflow_step_skipping": "C074_Workflow_Step_Skipping",
         "C075_Race_Condition": "generic_reproducibility",
-        "C076_Replay_Attack": "generic_reproducibility",
+        "C076_Replay_Attack": "C076_Replay_Attack",
+        "replay_attack": "C076_Replay_Attack",
         "C077_Missing_Reauthentication": "authorization_comparison",
+        "C078_HTTP_Request_Smuggling": "C078_HTTP_Request_Smuggling",
+        "http_request_smuggling": "C078_HTTP_Request_Smuggling",
+        "C079_Web_Cache_Poisoning": "C079_Web_Cache_Poisoning",
+        "web_cache_poisoning": "C079_Web_Cache_Poisoning",
+        "C080_Cross_Site_WebSocket_Hijacking": "C080_Cross_Site_WebSocket_Hijacking",
+        "cswsh": "C080_Cross_Site_WebSocket_Hijacking",
+        "C081_Host_Header_Injection": "C081_Host_Header_Injection",
+        "host_header_injection": "C081_Host_Header_Injection",
+        "C082_GraphQL_Batching_Nested_Query_DoS": "C082_GraphQL_Batching_Nested_Query_DoS",
+        "graphql_batching": "C082_GraphQL_Batching_Nested_Query_DoS",
+        "C083_GraphQL_Resolver_Auth_Bypass": "C083_GraphQL_Resolver_Auth_Bypass",
+        "graphql_resolver_auth": "C083_GraphQL_Resolver_Auth_Bypass",
+        "C084_OAuth_Redirect_URI_Validation": "C084_OAuth_Redirect_URI_Validation",
+        "oauth_redirect_uri": "C084_OAuth_Redirect_URI_Validation",
+        "C085_Missing_OAuth_State_Parameter": "C085_Missing_OAuth_State_Parameter",
+        "oauth_state_parameter": "C085_Missing_OAuth_State_Parameter",
+        "C086_Insecure_Deserialization_Indicators": "C086_Insecure_Deserialization_Indicators",
+        "insecure_deserialization": "C086_Insecure_Deserialization_Indicators",
         "Insecure Transport": "transport_security",
         "Insecure Transport Configuration": "transport_security",
         "transport_security": "transport_security",
@@ -467,9 +501,9 @@ class VerificationRegistry:
         "Insecure Transport Configuration": "http_response_property",
         "Authentication Bypass": "authentication_comparison",
         "Insecure Cookie Attributes": "http_response_property",
-        "Session Fixation": "generic_reproducibility",
+        "Session Fixation": "C017_Session_Fixation",
         "Session Invalidation Flaw": "authentication_comparison",
-        "Weak Password Policy": "generic_reproducibility",
+        "Weak Password Policy": "C019_Password_Policy_Weakness",
         "Insecure JWT Configuration": "authentication_comparison",
         "Insecure JWT Validation": "authentication_comparison",
         "Missing Rate Limiting": "auth_rate_limit",
@@ -487,10 +521,11 @@ class VerificationRegistry:
         "LDAP Injection": "generic_reproducibility",
         "Expression Language Injection": "generic_reproducibility",
         "Server-Side Request Forgery": "generic_reproducibility",
-        "Cross-Site Scripting": "generic_reproducibility",
-        "Stored Cross-Site Scripting": "generic_reproducibility",
-        "DOM-Based Cross-Site Scripting": "generic_reproducibility",
-        "HTML Injection": "generic_reproducibility",
+        "Cross-Site Scripting": "C037_Reflected_XSS",
+        "Stored Cross-Site Scripting": "C037_Reflected_XSS",
+        "DOM-Based Cross-Site Scripting": "C037_Reflected_XSS",
+        "HTML Injection": "C037_Reflected_XSS",
+        "xss_verification": "C037_Reflected_XSS",
     }
 
     @classmethod
@@ -1787,6 +1822,23 @@ from backend.services.verification_strategies.default_credentials_strategy impor
 from backend.services.verification_strategies.mass_assignment_strategy import MassAssignmentVerificationStrategy
 from backend.services.verification_strategies.parameter_tampering_strategy import ParameterTamperingVerificationStrategy
 from backend.services.verification_strategies.race_condition_strategy import RaceConditionVerificationStrategy
+from backend.services.verification_strategies.xss_strategy import XssVerificationStrategy
+from backend.services.verification_strategies.http_request_smuggling_strategy import HttpRequestSmugglingVerificationStrategy
+from backend.services.verification_strategies.web_cache_poisoning_strategy import WebCachePoisoningVerificationStrategy
+from backend.services.verification_strategies.cswsh_strategy import CswshVerificationStrategy
+from backend.services.verification_strategies.host_header_injection_strategy import HostHeaderInjectionVerificationStrategy
+from backend.services.verification_strategies.graphql_batching_strategy import GraphqlBatchingVerificationStrategy
+from backend.services.verification_strategies.graphql_resolver_auth_strategy import GraphqlResolverAuthVerificationStrategy
+from backend.services.verification_strategies.oauth_redirect_uri_strategy import OAuthRedirectUriVerificationStrategy
+from backend.services.verification_strategies.oauth_state_parameter_strategy import OAuthStateParameterVerificationStrategy
+from backend.services.verification_strategies.insecure_deserialization_strategy import InsecureDeserializationVerificationStrategy
+from backend.services.verification_strategies.ssrf_strategy import SsrfVerificationStrategy
+from backend.services.verification_strategies.ssti_strategy import SstiVerificationStrategy
+from backend.services.verification_strategies.nosql_injection_strategy import NosqlInjectionVerificationStrategy
+from backend.services.verification_strategies.path_traversal_strategy import PathTraversalVerificationStrategy
+from backend.services.verification_strategies.local_file_inclusion_strategy import LocalFileInclusionStrategy
+from backend.services.verification_strategies.ldap_injection_strategy import LdapInjectionVerificationStrategy
+from backend.services.verification_strategies.expression_language_strategy import ExpressionLanguageVerificationStrategy
 
 VerificationRegistry.register(SqlInjectionVerificationStrategy)
 VerificationRegistry.register(BlindSqlInjectionVerificationStrategy)
@@ -1803,6 +1855,23 @@ VerificationRegistry.register(DefaultCredentialsVerificationStrategy)
 VerificationRegistry.register(MassAssignmentVerificationStrategy)
 VerificationRegistry.register(ParameterTamperingVerificationStrategy)
 VerificationRegistry.register(RaceConditionVerificationStrategy)
+VerificationRegistry.register(XssVerificationStrategy)
+VerificationRegistry.register(HttpRequestSmugglingVerificationStrategy)
+VerificationRegistry.register(WebCachePoisoningVerificationStrategy)
+VerificationRegistry.register(CswshVerificationStrategy)
+VerificationRegistry.register(HostHeaderInjectionVerificationStrategy)
+VerificationRegistry.register(GraphqlBatchingVerificationStrategy)
+VerificationRegistry.register(GraphqlResolverAuthVerificationStrategy)
+VerificationRegistry.register(OAuthRedirectUriVerificationStrategy)
+VerificationRegistry.register(OAuthStateParameterVerificationStrategy)
+VerificationRegistry.register(InsecureDeserializationVerificationStrategy)
+VerificationRegistry.register(SsrfVerificationStrategy)
+VerificationRegistry.register(SstiVerificationStrategy)
+VerificationRegistry.register(NosqlInjectionVerificationStrategy)
+VerificationRegistry.register(PathTraversalVerificationStrategy)
+VerificationRegistry.register(LocalFileInclusionStrategy)
+VerificationRegistry.register(LdapInjectionVerificationStrategy)
+VerificationRegistry.register(ExpressionLanguageVerificationStrategy)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1810,6 +1879,8 @@ VerificationRegistry.register(RaceConditionVerificationStrategy)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class VerificationEngine:
+    def _get_strategy_factory(self):
+                return StrategyFactory
     """Central deterministic verification orchestrator."""
 
     def __init__(self, registry: Optional[Type[VerificationRegistry]] = None) -> None:
@@ -1973,6 +2044,7 @@ class VerificationEngine:
             "proof_request": finding.proof_request,
             "proof_response": finding.proof_response,
             "confidence": finding.confidence,
+            "cookies": auth_context.cookies if auth_context else {},
         }
 
         context = VerificationContext(
@@ -2127,3 +2199,8 @@ class VerificationEngine:
             finding.verification_status = "CANDIDATE"
             finding.finding_disposition = FindingDisposition.INCONCLUSIVE.value
             finding.bounty_eligibility = BountyEligibility.UNKNOWN.value
+
+
+# Automatically import and register all external modular verification strategies
+import backend.services.verification_strategies  # noqa: F401, E402
+

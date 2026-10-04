@@ -78,3 +78,12 @@ import backend.agents.checks.c074_workflow_step_skipping
 import backend.agents.checks.c075_race_condition
 import backend.agents.checks.c076_replay_attack
 import backend.agents.checks.c077_missing_reauthentication
+import backend.agents.checks.c078_http_request_smuggling
+import backend.agents.checks.c079_web_cache_poisoning
+import backend.agents.checks.c080_cross_site_websocket_hijacking
+import backend.agents.checks.c081_host_header_injection
+import backend.agents.checks.c082_graphql_batching_nested_query_dos
+import backend.agents.checks.c083_graphql_resolver_auth_bypass
+import backend.agents.checks.c084_oauth_redirect_uri_validation
+import backend.agents.checks.c085_missing_oauth_state_parameter
+import backend.agents.checks.c086_insecure_deserialization_indicators

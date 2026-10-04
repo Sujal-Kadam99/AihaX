@@ -63,11 +63,19 @@ async def run_scan_pipeline(scan_id: str, config: dict[str, Any]) -> None:
         # Phase 0: Scope authorization gating
         await _run_with_retry(ScopeAgent(scan_id, db, agent_config))
 
-                # Phase 1: Recon + Auth (sequential)
+        # Phase 1: Recon + Auth (sequential)
         recon_agent = ReconAgent(scan_id, db, agent_config)
         await _run_with_retry(recon_agent)
         auth_agent = AuthAgent(scan_id, db, agent_config)
         await _run_with_retry(auth_agent)
+
+        # Authenticated Recon Pass (if authentication succeeded)
+        shared_auth_ctx = getattr(auth_agent, "shared_context", None)
+        if shared_auth_ctx and (getattr(shared_auth_ctx, "account_1_authenticated", False) or getattr(shared_auth_ctx, "account_2_authenticated", False)):
+            try:
+                await recon_agent.run_authenticated_pass(shared_auth_ctx, db)
+            except Exception as e:
+                logging.warning(f"Authenticated recon pass encountered non-fatal error: {e}")
 
         # Phase 2: Vuln testing + Learning (parallel)
         learning_task = asyncio.create_task(
@@ -79,7 +87,9 @@ async def run_scan_pipeline(scan_id: str, config: dict[str, Any]) -> None:
         await _run_with_retry(vuln_agent)
 
         # Phase 3: Verification
-        await _run_with_retry(VerifyAgent(scan_id, db, agent_config))
+        verify_agent = VerifyAgent(scan_id, db, agent_config)
+        verify_agent.shared_auth_context = getattr(auth_agent, "shared_context", None)
+        await _run_with_retry(verify_agent)
 
         # Phase 4: Exploit chain analysis
         await _run_with_retry(ExploitChainAgent(scan_id, db, agent_config))

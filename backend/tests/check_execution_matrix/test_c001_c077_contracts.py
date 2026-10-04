@@ -29,7 +29,7 @@ from backend.services.request_engine import AuthenticationContext, ScopeValidato
 
 def test_all_77_contracts_valid_and_non_destructive():
     contracts = registry.list_checks()
-    assert len(contracts) == 77, f"Expected exactly 77 check contracts, got {len(contracts)}"
+    assert len(contracts) == 86, f"Expected exactly 86 check contracts, got {len(contracts)}"
 
     for c in contracts:
         assert isinstance(c, CheckContract)

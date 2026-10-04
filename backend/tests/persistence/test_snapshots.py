@@ -58,6 +58,6 @@ def test_registry_metadata_stable(db_session):
     meta2 = registry.get_registry_metadata()
 
     assert meta1["registry_version"] == "1.0.0"
-    assert meta1["check_count"] == 77
+    assert meta1["check_count"] == 86
     assert meta1["registry_hash"] == meta2["registry_hash"]
     assert meta1["contract_hash"] == meta2["contract_hash"]

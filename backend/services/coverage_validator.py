@@ -208,13 +208,13 @@ class CoverageValidator:
     def build_coverage_report(
         cls,
         campaign_result: CampaignResult,
-        expected_total: int = 77,
+        expected_total: int = 86,
     ) -> CampaignCoverageReport:
         """Build a CampaignCoverageReport from a completed CampaignResult.
 
         Args:
             campaign_result: A completed CampaignResult from CampaignExecutor.execute_campaign().
-            expected_total: Expected number of registered checks (default 77).
+            expected_total: Expected number of registered checks (default 86).
 
         Returns:
             CampaignCoverageReport with per-check execution status.
@@ -439,7 +439,7 @@ class CoverageValidator:
         }
 
     @classmethod
-    def validate_registry_completeness(cls, expected_count: int = 77) -> Dict[str, Any]:
+    def validate_registry_completeness(cls, expected_count: int = 86) -> Dict[str, Any]:
         """Validate that all expected checks are correctly registered.
 
         Returns a dict with validation results. Raises ValueError if checks are missing.

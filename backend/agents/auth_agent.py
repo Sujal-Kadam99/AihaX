@@ -117,6 +117,7 @@ class AccountCredentialReference:
     has_token: bool = False
     auth_method: str = "CREDENTIALS"
     # Ephemeral in-memory credential storage (NEVER persisted to DB or logs)
+    _ephemeral_username: Optional[str] = field(default=None, repr=False)
     _ephemeral_password: Optional[str] = field(default=None, repr=False)
     _ephemeral_token: Optional[str] = field(default=None, repr=False)
 
@@ -355,6 +356,120 @@ class MockBrowserDriver(IBrowserDriver):
         return True, mock_cookies, {}, None
 
 
+class PlaywrightBrowserDriver(IBrowserDriver):
+    """Real headless browser driver using Playwright for automated web authentication."""
+
+    async def perform_login(
+        self,
+        login_url: str,
+        creds: AccountCredentialReference,
+        timeout_seconds: int = 30,
+    ) -> Tuple[bool, List[Dict[str, Any]], Dict[str, str], Optional[str], Optional[str]]:
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            return False, [], {}, None, "Playwright not installed"
+
+        raw_username = creds._ephemeral_username or creds.username_hint or ""
+        raw_password = creds._ephemeral_password or ""
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(ignore_https_errors=True)
+                page = await context.new_page()
+
+                # Navigate to login URL or target/login.php
+                await page.goto(login_url, timeout=timeout_seconds * 1000)
+                await page.wait_for_timeout(1000)
+
+                user_selectors = [
+                    "input[name='username']",
+                    "input[name='user']",
+                    "input[name='email']",
+                    "input[name='login']",
+                    "input[type='email']",
+                    "input[type='text']",
+                ]
+                pass_selectors = [
+                    "input[name='password']",
+                    "input[name='pass']",
+                    "input[name='pwd']",
+                    "input[type='password']",
+                ]
+                submit_selectors = [
+                    "input[name='Login']",
+                    "input[type='submit']",
+                    "button[type='submit']",
+                    "button:has-text('Login')",
+                    "button:has-text('Sign in')",
+                    "button:has-text('Log in')",
+                ]
+
+                # If no username input on current page, try common login subpaths
+                has_user = False
+                for sel in user_selectors:
+                    if await page.locator(sel).count() > 0:
+                        has_user = True
+                        break
+
+                if not has_user:
+                    for subpath in ["/login.php", "/login", "/#/login"]:
+                        try:
+                            parsed_u = urlparse(login_url)
+                            try_url = f"{parsed_u.scheme}://{parsed_u.netloc}{subpath}"
+                            await page.goto(try_url, timeout=5000)
+                            await page.wait_for_timeout(500)
+                            for sel in user_selectors:
+                                if await page.locator(sel).count() > 0:
+                                    has_user = True
+                                    break
+                            if has_user:
+                                break
+                        except Exception:
+                            pass
+
+                # Fill username
+                for sel in user_selectors:
+                    loc = page.locator(sel)
+                    if await loc.count() > 0 and await loc.first.is_visible():
+                        await loc.first.fill(raw_username)
+                        break
+
+                # Fill password
+                for sel in pass_selectors:
+                    loc = page.locator(sel)
+                    if await loc.count() > 0 and await loc.first.is_visible():
+                        await loc.first.fill(raw_password)
+                        break
+
+                # Click submit
+                for sel in submit_selectors:
+                    loc = page.locator(sel)
+                    if await loc.count() > 0 and await loc.first.is_visible():
+                        await loc.first.click()
+                        break
+
+                await page.wait_for_timeout(1000)
+
+                # Extract cookies
+                cookies = await context.cookies()
+                await browser.close()
+
+                if cookies:
+                    return True, cookies, {}, None, None
+                return False, [], {}, None, "No session cookies established after login"
+        except Exception as e:
+            return False, [], {}, None, str(e)
+
+    async def submit_otp(
+        self,
+        otp_value: str,
+        timeout_seconds: int = 30,
+    ) -> Tuple[bool, List[Dict[str, Any]], Dict[str, str], Optional[str]]:
+        return False, [], {}, "OTP automation not supported in Playwright driver"
+
+
 # ==============================================================================
 # 5. AuthenticationAgent Implementation
 # ==============================================================================
@@ -375,7 +490,12 @@ class AuthAgent(BaseAgent):
         self.scan_id = scan_id or "default-scan"
         self.db = db
         self.config = config or {}
-        self.driver = browser_driver or MockBrowserDriver()
+        if browser_driver is not None:
+            self.driver = browser_driver
+        elif self.config.get("allow_loopback") or self.config.get("execution_mode") == "AUTHORIZED_LIVE_RECON":
+            self.driver = PlaywrightBrowserDriver()
+        else:
+            self.driver = MockBrowserDriver()
 
         target_url = self.config.get("target_url") or self.config.get("target", "")
         self.shared_context = SharedAuthContext(
@@ -418,6 +538,7 @@ class AuthAgent(BaseAgent):
         is_safe, safety_reason = validate_destination_safety(
             target_url,
             allowed_ports=set(self.config.get("allowed_ports", [])) if self.config.get("allowed_ports") else None,
+            allow_loopback=bool(self.config.get("allow_loopback", False)),
         )
         if not is_safe:
             return False, AuthState.BLOCKED_SAFETY.value, f"Target blocked by Destination Safety: {safety_reason}"
@@ -445,6 +566,7 @@ class AuthAgent(BaseAgent):
             has_password=bool(password),
             has_token=bool(token),
             auth_method=auth_method,
+            _ephemeral_username=username,
             _ephemeral_password=password,
             _ephemeral_token=token,
         )
@@ -522,6 +644,9 @@ class AuthAgent(BaseAgent):
                 self._persist_auth_record(account_ctx, db)
             return account_ctx
 
+        logger.info(f"[AUTH_AGENT] perform_login result: success={success} mfa_type={mfa_type} err_msg={err_msg} cookies_count={len(cookies) if cookies else 0}")
+        print(f"[AUTH_AGENT] perform_login result: success={success} mfa_type={mfa_type} err_msg={err_msg} cookies_count={len(cookies) if cookies else 0}", flush=True)
+
         # 4. Handle MFA / OTP Challenge
         if mfa_type:
             account_ctx.auth_status = AuthState.OTP_REQUIRED.value
@@ -567,8 +692,9 @@ class AuthAgent(BaseAgent):
         )
         account_ctx.session_handle = session_handle
         account_ctx.auth_status = AuthState.AUTHENTICATED.value
-        account_ctx.last_authenticated_at = get_utc_now().isoformat()
         account_ctx._cookies = list(cookies)
+        logger.info(f"[AUTH_AGENT] _establish_session: account_id={account_id} cookies_count={len(cookies)} cookies_sample={[c.get('name') for c in cookies[:3]]}")
+        print(f"[AUTH_AGENT] _establish_session: account_id={account_id} cookies_count={len(cookies)} cookies_sample={[c.get('name') for c in cookies[:3]]}", flush=True)
         account_ctx._headers = dict(headers)
 
         if account_id == AccountId.ACCOUNT_1.value:
@@ -691,6 +817,7 @@ class AuthAgent(BaseAgent):
                 "mfa_type": ctx.mfa_type,
                 "last_authenticated_at": ctx.last_authenticated_at,
                 "username_hint": ctx.username_hint,
+                "cookies": {c["name"]: c["value"] for c in ctx._cookies if isinstance(c, dict) and "name" in c and "value" in c} if isinstance(ctx._cookies, list) else (ctx._cookies if isinstance(ctx._cookies, dict) else {}),
             }
 
             if not rec:
@@ -739,8 +866,20 @@ class AuthAgent(BaseAgent):
     async def execute(self) -> Dict[str, Any]:
         """Execute legacy primary and secondary login flow for BaseAgent scans."""
         target_url = self.config.get("target_url", "")
-        primary_creds = self.config.get("primary_creds")
-        secondary_creds = self.config.get("secondary_creds")
+        primary_creds = (
+            self.config.get("primary_creds")
+            or self.config.get("credentials")
+            or self.config.get("creds")
+            or self.config.get("primary_credentials")
+            or self.config.get("account_1_creds")
+        )
+        logger.info(f"[AUTH_AGENT EXECUTE] primary_creds resolved to: {primary_creds}")
+        secondary_creds = (
+            self.config.get("secondary_creds")
+            or self.config.get("secondary_credentials")
+            or self.config.get("account_2_creds")
+            or self.config.get("second_creds")
+        )
 
         sessions: Dict[str, Any] = {
             "primary": None,
