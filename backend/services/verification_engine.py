@@ -1879,6 +1879,8 @@ VerificationRegistry.register(ExpressionLanguageVerificationStrategy)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class VerificationEngine:
+    def _get_strategy_factory(self):
+                return StrategyFactory
     """Central deterministic verification orchestrator."""
 
     def __init__(self, registry: Optional[Type[VerificationRegistry]] = None) -> None:
