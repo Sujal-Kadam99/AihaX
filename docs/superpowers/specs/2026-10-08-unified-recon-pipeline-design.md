@@ -5,7 +5,15 @@
 
 ## Goal
 
-Every `RECON_ONLY` campaign run should use AihaX's established reconnaissance capabilities through one campaign pipeline. Passive discovery and low-impact web inventory must be visible per provider, respect the campaign's saved authorization and scope, and never be reported as vulnerability verification.
+Whenever AihaX performs reconnaissance in Safe Scan, Recon Only, Plan Only, or Fully Authorized mode, it must use the same campaign reconnaissance pipeline. Passive discovery, low-impact web inventory, provenance, and result semantics stay consistent across modes. Mode and authorization change which additional actions may run; they do not select a different recon method.
+
+## Mode behavior
+
+- `RECON_ONLY`: run the shared recon pipeline and no vulnerability checks.
+- `PLAN_ONLY`: run the shared recon pipeline, then build the check plan; execute no vulnerability checks.
+- `SAFE_SCAN`: run the shared recon pipeline before configured safe checks. Nmap and Gobuster remain off unless separately selected and authorized.
+- Fully Authorized (`assessment_mode == PRODUCTION_AUTHORIZED`): run the same recon pipeline before authorized checks. Nmap and Gobuster still require explicit per-run selection and saved scope/port authorization; the broader campaign mode does not implicitly enable them.
+- Any recon dispatch whose authorization, scope snapshot, or required-provider preflight fails stops before target traffic and prevents dependent check work from starting.
 
 ## Required behavior
 
@@ -23,19 +31,19 @@ Nuclei and Dalfox remain outside `RECON_ONLY`: they perform vulnerability testin
 
 ## Architecture and data flow
 
-1. `NewAssessment` creates, explicitly authorizes, and starts the campaign. `CampaignOperationsService.start_campaign` must detect `RECON_ONLY` and create no vulnerability-check tasks. It instead creates one durable recon run. The existing initial campaign snapshot remains the immutable authorization/scope snapshot and is not overwritten with results.
-2. `CampaignWorkerRuntime` claims and executes the pending recon run separately from ordinary `ExecutionTask` check work. It recovers stale recon leases and marks the campaign complete only after the recon run reaches a terminal state. A `RECON_ONLY` campaign never reaches the check execution branch in `CampaignWorker.execute_task`.
-3. The worker builds a live `ReconContext` from the campaign's concrete target, active authorization record, program scope (including exclusions), request budget, and a recorded operator confirmation. The same saved authorization/scope checks used by campaign execution must pass immediately before dispatch.
-4. One campaign-facing recon service runs the configured passive providers and built-in wordlist, normalizes and deduplicates results, and preserves provider provenance and status. It combines provider discovery with the existing HTTP, technology/login-surface, and endpoint-discovery inventory without duplicating requests.
+1. `NewAssessment` creates, explicitly authorizes, and starts the campaign. Every mode whose flow performs recon creates one durable recon run before dependent check work. `CampaignOperationsService.start_campaign` creates zero vulnerability-check tasks for `RECON_ONLY` and `PLAN_ONLY`; Safe Scan and Fully Authorized checks remain queued behind successful recon. The initial campaign snapshot remains immutable and is not overwritten with results.
+2. `CampaignWorkerRuntime` claims recon records before ordinary `ExecutionTask` work, recovers stale recon leases, and does not dispatch dependent checks until the shared recon run succeeds. `RECON_ONLY` and `PLAN_ONLY` never reach the vulnerability check execution branch.
+3. The worker builds one `ReconContext` from the campaign's concrete target, active authorization record, program scope (including exclusions), request budget, recorded operator confirmation, and mode policy. The same saved authorization/scope checks must pass immediately before dispatch in every mode.
+4. One campaign-facing recon service runs the same configured passive providers and built-in wordlist in every mode, normalizes and deduplicates results, and preserves provider provenance/status. It combines provider discovery with HTTP, technology/login-surface, and endpoint-discovery inventory without duplicating requests. Recon results are available to Plan Only and downstream authorized checks.
 5. Every discovered hostname is rechecked against in-scope and out-of-scope rules before DNS enrichment or any HTTP request. Out-of-scope rules win. Discovery alone never grants authorization. Requests continue through the existing request engine and its destination-safety and request-budget controls.
-6. Nmap and Gobuster run only when individually selected in campaign preflight and authorized for the campaign. Nmap's effective port set is the intersection of selected profile and explicit `allowed_ports`, minus `excluded_ports`. Empty or malformed authorization fails closed. Gobuster is similarly scope-gated and uses the bundled wordlist and fixed low concurrency.
-7. A durable recon-run result stores per-provider status, output summary, errors, counts, and evidence/provenance and is exposed in campaign details. Every provider/tool is recorded as executed, unavailable, blocked, failed, or stub-only; missing required providers block launch before target traffic. No vulnerability check IDs are executed or counted as verified findings by `RECON_ONLY`.
+6. Nmap and Gobuster run only when individually selected in campaign preflight and authorized for the campaign, regardless of campaign mode. Nmap's effective port set is the intersection of selected profile and explicit `allowed_ports`, minus `excluded_ports`. Empty or malformed authorization fails closed. Gobuster is similarly scope-gated and uses the bundled wordlist and fixed low concurrency.
+7. A durable recon-run result stores mode, per-provider status, output summary, errors, counts, and evidence/provenance and is exposed in campaign details. Every provider/tool is recorded as executed, unavailable, blocked, failed, or stub-only; missing required providers block target traffic and dependent checks. No vulnerability check IDs execute or count as verified findings in Recon Only or Plan Only.
 
-The current campaign start path auto-queues vulnerability checks regardless of campaign mode, and `CampaignWorker` executes those checks. `CampaignExecutor`'s `RECON_ONLY` branch is not the worker path used by the UI. The legacy `ReconOrchestrator` and newer `UnifiedReconOrchestrator` also form separate paths. The implementation must correct campaign dispatch first, establish one campaign-facing pipeline, and avoid duplicate HTTP probing or endpoint requests when adapting provider output.
+The current campaign start path auto-queues vulnerability checks regardless of campaign mode, and `CampaignWorker` executes those checks. `CampaignExecutor`'s `RECON_ONLY`/`PLAN_ONLY` branches are not the worker path used by the UI. The legacy `ReconOrchestrator`, newer `UnifiedReconOrchestrator`, and operator live-recon validator also form separate paths. The implementation must establish one shared campaign pipeline for all four modes, gate dependent checks on its result, and avoid duplicate HTTP probing or endpoint requests.
 
 ## User experience
 
-The preflight names the providers and active capabilities that will be used. Passive providers and low-impact inventory run as part of recon. Nmap and Gobuster stay off until selected. Campaign status and the Recon tab show run state, per-provider status, discovered in-scope assets, endpoint counts, technology observations, Nmap effective ports, Gobuster scope, and explicit reasons for skipped or failed work.
+The preflight names the providers and active capabilities that will be used. All four modes show the same passive providers and low-impact inventory. Nmap and Gobuster stay off until selected. Campaign status and the Recon tab show run state/mode, per-provider status, discovered in-scope assets, endpoint counts, technology observations, Nmap effective ports, Gobuster scope, and explicit reasons for skipped or failed work.
 
 ## Safety and error handling
 
@@ -46,12 +54,14 @@ The preflight names the providers and active capabilities that will be used. Pas
 
 ## Verification
 
-Use mocked providers and local fixtures to prove the campaign path invokes the configured recon suite once, scope-gates every discovered host before active follow-up, reports unavailable/stub providers truthfully, applies port exclusions to Nmap, requires explicit opt-in for Nmap/Gobuster, and executes zero vulnerability checks in `RECON_ONLY`. Do not validate against a third-party target as part of implementation.
+Use mocked providers and local fixtures to prove all four modes invoke the same required provider sequence and produce the same discovery semantics, while mode-specific gates affect only allowed active work and dependent checks. Also prove the campaign path scope-gates every discovered host before follow-up, reports unavailable/stub providers truthfully, applies port exclusions to Nmap, requires explicit opt-in for Nmap/Gobuster, and executes zero vulnerability checks in `RECON_ONLY` and `PLAN_ONLY`. Do not validate against a third-party target as part of implementation.
 
 ## Self-review
 
 - The capability list matches the requested recon workflow and separates active service/path discovery from passive providers.
 - Campaign start and worker dispatch are included; merely changing `CampaignExecutor` would not affect the UI path.
+- Safe, Recon Only, Plan Only, and Fully Authorized modes share the same recon service; mode gates only suppress disallowed actions and dependent work.
+- The mode matrix distinguishes `SAFE_SCAN` from `assessment_mode == PRODUCTION_AUTHORIZED` while using the same recon pipeline.
 - Recon run state/results do not alter the immutable authorization snapshot.
 - Both existing orchestration paths are accounted for; duplicate requests are explicitly prohibited.
 - Authorization remains the gate for use of discovered assets and active probes.
