@@ -1,0 +1,8 @@
+.:53 {
+    errors
+    log
+    hosts {
+        172.30.77.10 fixture.gate.test
+        fallthrough
+    }
+}

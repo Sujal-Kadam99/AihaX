@@ -1,0 +1,65 @@
+services:
+  fixture:
+    image: nginx@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
+    labels:
+      aihax.campaign-id: ${AIHAX_CAMPAIGN_ID:?Set AIHAX_CAMPAIGN_ID}
+      aihax.role: local-fixture
+    networks:
+      campaign:
+        ipv4_address: 172.30.77.10
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+
+  resolver:
+    image: coredns/coredns@sha256:40384aa1f5ea6bfdc77997d243aec73da05f27aed0c5e9d65bfa98933c519d97
+    command: ["-conf", "/etc/coredns/Corefile"]
+    labels:
+      aihax.campaign-id: ${AIHAX_CAMPAIGN_ID:?Set AIHAX_CAMPAIGN_ID}
+      aihax.role: logging-dns
+    networks:
+      campaign:
+        ipv4_address: 172.30.77.53
+    volumes:
+      - ./Corefile:/etc/coredns/Corefile:ro
+
+  scanner:
+    image: nicolaka/netshoot@sha256:a20c2531bf35436ed3766cd6cfe89d352b050ccc4d7005ce6400adf97503da1b
+    command: ["sleep", "infinity"]
+    labels:
+      aihax.campaign-id: ${AIHAX_CAMPAIGN_ID:?Set AIHAX_CAMPAIGN_ID}
+      aihax.role: isolated-scanner
+    environment:
+      AIHAX_CAMPAIGN_ID: ${AIHAX_CAMPAIGN_ID:?Set AIHAX_CAMPAIGN_ID}
+    networks:
+      campaign:
+        ipv4_address: 172.30.77.20
+    dns:
+      - 172.30.77.53
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./certs/ca.crt:/trust/ca.crt:ro
+      - ./evidence:/evidence
+
+  capture:
+    image: nicolaka/netshoot@sha256:a20c2531bf35436ed3766cd6cfe89d352b050ccc4d7005ce6400adf97503da1b
+    network_mode: service:scanner
+    command: ["tcpdump", "-i", "eth0", "-nn", "-U", "-w", "/evidence/campaign.pcap"]
+    labels:
+      aihax.campaign-id: ${AIHAX_CAMPAIGN_ID:?Set AIHAX_CAMPAIGN_ID}
+      aihax.role: connection-capture
+    cap_add: [NET_RAW]
+    depends_on: [scanner]
+    volumes:
+      - ./evidence:/evidence
+
+networks:
+  campaign:
+    name: aihax-gatea-${AIHAX_CAMPAIGN_ID:?Set AIHAX_CAMPAIGN_ID}
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.77.0/24
