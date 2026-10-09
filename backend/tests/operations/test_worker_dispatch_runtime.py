@@ -161,6 +161,38 @@ def test_2_start_does_not_duplicate_task(db_session):
     assert initial_count == second_count
 
 
+@pytest.mark.parametrize(
+    ("mode", "expected_task"),
+    [
+        ("RECON_ONLY", "PIPELINE_RECON_ONLY"),
+        ("SAFE_SCAN", "PIPELINE_RECON_THEN_VTA"),
+    ],
+)
+def test_campaign_mode_queues_the_correct_ordered_pipeline(db_session, mode, expected_task):
+    camp, _ = _setup_authorized_campaign(db_session)
+    camp.mode = mode
+    db_session.flush()
+
+    CampaignOperationsService(CampaignRepository(db_session)).start_campaign(camp.id, auto_dispatch=True)
+
+    tasks = db_session.query(ExecutionTask).filter(ExecutionTask.campaign_id == camp.id).all()
+    assert len(tasks) == 1
+    assert tasks[0].check_id == expected_task
+
+
+def test_campaign_tool_selection_defaults_to_zap_and_allows_explicit_disable(db_session):
+    ops = CampaignOperationsService(CampaignRepository(db_session))
+    default_campaign = ops.create_campaign(name="Default Tools", target_url="https://example.test.local")
+    disabled_campaign = ops.create_campaign(
+        name="No Optional Tools", target_url="https://other.test.local", selected_tools=[]
+    )
+
+    default_snapshot = json.loads(CampaignRepository(db_session).get_snapshot(default_campaign.id).snapshot_json)
+    disabled_snapshot = json.loads(CampaignRepository(db_session).get_snapshot(disabled_campaign.id).snapshot_json)
+    assert default_snapshot["selected_tools"] == ["zap"]
+    assert disabled_snapshot["selected_tools"] == []
+
+
 @pytest.mark.asyncio
 async def test_3_worker_starts(db_session):
     """3. CampaignWorkerRuntime starts and stops cleanly."""

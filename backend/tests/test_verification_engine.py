@@ -10,7 +10,9 @@ import json
 import pytest
 
 from backend.core.scope_validator import ScopeValidator
+from backend.evidence.evidence_store import EvidenceVault
 from backend.models.database import Finding
+from backend.persistence.repository import CampaignRepository
 from backend.services.bug_bounty_generator import BugBountyReportGenerator
 from backend.services.request_engine import (
     AuthenticationContext,
@@ -103,6 +105,30 @@ async def test_1_and_2_candidate_becomes_verified_deterministically(request_engi
     assert finding.false_positive is False
     assert len(json.loads(finding.evidence_ids)) > 0
     assert len(json.loads(finding.request_ids)) > 0
+
+
+@pytest.mark.asyncio
+async def test_verification_evidence_ids_resolve_to_persisted_vault_records(db_session):
+    repo = CampaignRepository(db_session)
+    campaign = repo.create_campaign(name="Verification evidence", target_url="http://example.com")
+    transport = MockTransport()
+    transport.add_route("http://example.com/", status=200, body="public home page")
+    engine = RequestEngine(scope_validator=ScopeValidator(in_scope_assets=["http://example.com"]), transport=transport)
+    finding = Finding(
+        id="FIND-EVIDENCE-1", scan_id=campaign.id, agent_id=3, title="Transport check",
+        vuln_type="C001_Open_Port_80", category="transport", severity="low",
+        affected_url="https://example.com/", confidence=50,
+    )
+
+    conclusion = await VerificationEngine().verify_finding(
+        finding=finding,
+        request_engine=engine,
+        evidence_vault=EvidenceVault(repo),
+    )
+
+    assert conclusion.evidence_ids
+    assert all(not evidence_id.startswith("EVD-") for evidence_id in conclusion.evidence_ids)
+    assert all(EvidenceVault(repo).get_evidence(evidence_id) for evidence_id in conclusion.evidence_ids)
 
 
 @pytest.mark.asyncio

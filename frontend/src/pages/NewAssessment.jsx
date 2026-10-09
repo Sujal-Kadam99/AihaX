@@ -56,7 +56,36 @@ export default function NewAssessment() {
   const [targetBudget, setTargetBudget] = useState(100);
   const [checkBudget, setCheckBudget] = useState(20);
   const [maxConcurrency, setMaxConcurrency] = useState(5);
+  const [selectedTools, setSelectedTools] = useState(['zap']);
   const [operatorConfirmed, setOperatorConfirmed] = useState(false);
+
+  const highRiskTools = [
+    { id: 'sqlmap', label: 'SQLmap', description: 'Bounded SQL injection validation; no database dumps or writes.' },
+    { id: 'commix', label: 'Commix', description: 'Command injection canary verification; no interactive shell.' },
+    { id: 'metasploit', label: 'Metasploit', description: 'Allowlisted check modules only; no payload sessions.' },
+    { id: 'beef', label: 'BeEF', description: 'Controlled browser hook proof; requires an operator-controlled test browser.' },
+    { id: 'routersploit', label: 'RouterSploit', description: 'Allowlisted scanner modules only; no credential attacks.' },
+  ];
+  const optionalTools = [
+    { id: 'zap', label: 'OWASP ZAP' },
+    { id: 'nikto', label: 'Nikto' },
+    { id: 'ffuf', label: 'ffuf' },
+    { id: 'dirsearch', label: 'dirsearch' },
+    { id: 'searchsploit', label: 'SearchSploit (offline leads)' },
+  ];
+
+  function toggleTool(toolId, checked) {
+    setSelectedTools((current) => checked
+      ? [...new Set([...current, toolId])]
+      : current.filter((item) => item !== toolId));
+  }
+
+  function selectAllHighRisk(checked) {
+    setSelectedTools((current) => {
+      const withoutHighRisk = current.filter((item) => !highRiskTools.some((tool) => tool.id === item));
+      return checked ? [...withoutHighRisk, ...highRiskTools.map((tool) => tool.id)] : withoutHighRisk;
+    });
+  }
 
   // Launching state
   const [starting, setStarting] = useState(false);
@@ -216,6 +245,7 @@ export default function NewAssessment() {
         max_concurrency: isProduction ? 1 : Math.max(1, parseInt(maxConcurrency, 10) || 5),
         rate_limit_rps: isProduction ? 2 : 10,
         in_scope_assets: [cleanUrl],
+        selected_tools: selectedTools,
       });
 
       const campaignId = createRes.data?.data?.campaign_id || createRes.data?.data?.id;
@@ -550,7 +580,7 @@ export default function NewAssessment() {
                   <option value="SAFE_SCAN">SAFE_SCAN (Safe & Non-Destructive)</option>
                   <option value="PLAN_ONLY">PLAN_ONLY (Recon & Graph Only)</option>
                   <option value="RECON_ONLY">RECON_ONLY (Reconnaissance Only)</option>
-                  {!isProduction && <option value="FULL_AUTHORIZED_SCAN">FULL_AUTHORIZED_SCAN (All 77 Checks)</option>}
+                  {!isProduction && <option value="FULL_AUTHORIZED_SCAN">FULL_AUTHORIZED_SCAN (All 86 Checks)</option>}
                 </select>
               </div>
             </div>
@@ -617,6 +647,35 @@ export default function NewAssessment() {
                 />
               </div>
             )}
+            <section className="rounded border border-border p-3.5 space-y-3" aria-labelledby="vta-tools-heading">
+              <div>
+                <h3 id="vta-tools-heading" className="text-xs font-semibold text-text-primary uppercase tracking-wider">Vulnerability Testing Tools</h3>
+                <p className="text-[11px] text-text-muted mt-1">VTA selects among enabled tools only when recon evidence and a hypothesis justify the tool. Tools may be skipped when unavailable or outside the campaign budget.</p>
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {optionalTools.map((tool) => (
+                  <label key={tool.id} className="inline-flex items-center gap-2 text-xs text-text-secondary">
+                    <input type="checkbox" checked={selectedTools.includes(tool.id)} onChange={(event) => toggleTool(tool.id, event.target.checked)} />
+                    {tool.label}
+                  </label>
+                ))}
+              </div>
+              <div className="rounded border border-amber-800/50 bg-amber-950/15 p-3 space-y-2">
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-amber-300">
+                  <input type="checkbox" checked={highRiskTools.every((tool) => selectedTools.includes(tool.id))} onChange={(event) => selectAllHighRisk(event.target.checked)} />
+                  Select all high-risk tools
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {highRiskTools.map((tool) => (
+                    <label key={tool.id} className="flex items-start gap-2 text-xs text-text-secondary">
+                      <input className="mt-0.5" type="checkbox" checked={selectedTools.includes(tool.id)} onChange={(event) => toggleTool(tool.id, event.target.checked)} />
+                      <span><strong>{tool.label}</strong><span className="block text-[10px] text-text-muted">{tool.description}</span></span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[10px] text-amber-200/80">Selecting a high-risk tool authorizes only its bounded campaign profile; scope and tool-specific safety rules still apply.</p>
+              </div>
+            </section>
           </div>
         </Card>
 

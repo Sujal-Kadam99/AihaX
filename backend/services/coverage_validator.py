@@ -1,7 +1,7 @@
-"""AihaX Phase 6 — 77-Check Coverage Validator & Campaign Coverage Report.
+"""AihaX Phase 6 — 86-Check Coverage Validator & Campaign Coverage Report.
 
 Provides:
-- CoverageValidator: Maps each C001–C077 check to its execution status
+- CoverageValidator: Maps registered checks to their execution status
   and generates a machine-readable coverage matrix.
 - CampaignCoverageReport: Structured per-check execution evidence record
   derived from a completed CampaignResult.
@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
-import backend.agents.checks  # Ensure all 77 checks are registered
+import backend.agents.checks  # Ensure all registered checks are loaded
 from backend.core.check_registry import CheckCategory, CheckContract, Severity, registry
 from backend.services.campaign_executor import (
     AUTHENTICATION_REQUIRED_CHECKS,
@@ -193,7 +193,7 @@ class CampaignCoverageReport:
 # ──────────────────────────────────────────────────────────────────────────────
 
 class CoverageValidator:
-    """Derives a machine-readable 77-check coverage matrix from a CampaignResult.
+    """Derives a machine-readable 86-check coverage matrix from a CampaignResult.
 
     Usage::
 
@@ -392,7 +392,7 @@ class CoverageValidator:
     def build_registry_matrix(cls) -> Dict[str, Any]:
         """Build a static check registry matrix (no campaign needed).
 
-        Returns a structured dict of all 77 checks grouped by category,
+        Returns a structured dict of all registered checks grouped by category,
         with their prerequisite requirements and target surfaces.
         Useful for pre-campaign planning and audit.
         """

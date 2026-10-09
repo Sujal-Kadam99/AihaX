@@ -58,6 +58,7 @@ class CreateCampaignRequest(BaseModel):
     rate_limit_rps: int = Field(default=10, ge=1, le=50)
     in_scope_assets: Optional[List[str]] = None
     selected_checks: Optional[List[str]] = None
+    selected_tools: Optional[List[str]] = None
     program_id: Optional[str] = None
 
 
@@ -137,6 +138,7 @@ def create_campaign(
             user_id=user_id,
             in_scope_assets=payload.in_scope_assets,
             selected_checks=payload.selected_checks,
+            selected_tools=payload.selected_tools,
         )
         db.commit()
         return {"success": True, "data": service.get_campaign_status(campaign.id)}

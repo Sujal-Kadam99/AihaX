@@ -241,6 +241,25 @@ class CampaignWorker:
 
             req_engine = self.get_request_engine(target_url, validator=validator)
 
+            # Campaign-level pipeline jobs keep recon and vulnerability testing ordered
+            # and ensure RECON_ONLY cannot fall through to the individual-check runner.
+            if task.check_id in {"PIPELINE_RECON_ONLY", "PIPELINE_RECON_THEN_VTA"}:
+                pipeline_result = await self._execute_pipeline_task(
+                    campaign=campaign,
+                    task=task,
+                    session=session,
+                    repo=repo,
+                    vault=vault,
+                    target_url=target_url,
+                    in_scope=in_scope,
+                    out_of_scope=out_of_scope,
+                    request_engine=req_engine,
+                )
+                repo.complete_task(task_id, self.worker_id)
+                session.commit()
+                self._evaluate_campaign_completion(campaign.id, session, repo)
+                return {"status": "completed", "task_id": task_id, **pipeline_result}
+
             # 6. Resolve and execute Check from Registry (fail closed if unknown or destructive)
             check_cls = None
             try:
@@ -395,6 +414,7 @@ class CampaignWorker:
                     finding=finding,
                     request_engine=req_engine,
                     authorization_confirmed=True,
+                    evidence_vault=EvidenceVault(repo),
                 )
 
                 # Fully automated verification gate
@@ -536,6 +556,186 @@ class CampaignWorker:
                 except Exception:
                     pass
                 self._active_heartbeat_tasks.pop(task_id, None)
+
+    async def _execute_pipeline_task(
+        self,
+        *,
+        campaign: Campaign,
+        task: ExecutionTask,
+        session: Session,
+        repo: CampaignRepository,
+        vault: EvidenceVault,
+        target_url: str,
+        in_scope: List[str],
+        out_of_scope: List[str],
+        request_engine: RequestEngine,
+    ) -> Dict[str, Any]:
+        """Run one campaign's recon stage and, where selected, hand it to VTA."""
+        from backend.agents.recon_agent import ReconAgent
+
+        authorization = repo.get_authorization(campaign.id)
+        if not authorization:
+            raise ValueError("Pipeline task has no persisted authorization record.")
+
+        recon_config = {
+            "target_url": target_url,
+            "authorization_confirmed": True,
+            "authorization_record_id": authorization.id,
+            "operator_id": authorization.authorized_by,
+            "in_scope_assets": in_scope or [target_url],
+            "out_of_scope_assets": out_of_scope,
+            "execution_mode": "AUTHORIZED_LIVE_RECON",
+            "allow_loopback": False,
+            "enable_subdomain_discovery": True,
+            "enable_port_scan": True,
+            "enable_tech_detection": True,
+            "enable_url_discovery": True,
+            "enable_directory_discovery": True,
+            "enable_active_crawler": True,
+            "enable_dns_analysis": True,
+            "enable_tls_analysis": True,
+        }
+        recon_agent = ReconAgent(campaign.id, session, recon_config, request_engine=request_engine)
+        await recon_agent.execute()
+        snapshot = getattr(recon_agent, "recon_snapshot", None)
+        if snapshot is None:
+            raise RuntimeError("ReconAgent completed without producing a ReconSnapshot.")
+
+        result: Dict[str, Any] = {
+            "mode": campaign.mode,
+            "recon_status": snapshot.status,
+            "recon_snapshot_hash": snapshot.snapshot_hash,
+            "recon_observation_count": snapshot.observation_count,
+            "recon_tool_results": snapshot.tool_results,
+            "vulnerability_testing": None,
+        }
+        evidence = vault.store_evidence(
+            campaign_id=campaign.id,
+            evidence_type="CAMPAIGN_RECON_REPORT",
+            target_url=target_url,
+            method="RECON",
+            raw_request="ReconAgent pipeline execution",
+            raw_response=json.dumps(snapshot.to_dict(), sort_keys=True, default=str),
+            payload_summary=f"Recon status={snapshot.status}; observations={snapshot.observation_count}; snapshot={snapshot.snapshot_hash}",
+            task_id=task.id,
+        )
+        result["recon_evidence_id"] = evidence.id
+
+        is_recon_only = task.check_id == "PIPELINE_RECON_ONLY"
+        if not is_recon_only:
+            from backend.agents.vulnerability_testing_agent import VulnerabilityTestingAgent
+            from backend.services.vulnerability_execution_engine import ExecutionMode
+
+            snapshot_record = repo.get_snapshot(campaign.id)
+            selected_tools: List[str] = []
+            if snapshot_record and snapshot_record.snapshot_json:
+                try:
+                    selected_tools = json.loads(snapshot_record.snapshot_json).get("selected_tools", [])
+                except (TypeError, ValueError):
+                    selected_tools = []
+            vta_config = {
+                **recon_config,
+                "assessment_mode": campaign.assessment_mode,
+                "execution_mode": "authorized_live",
+                "in_scope_assets": in_scope or [target_url],
+                "out_of_scope_assets": out_of_scope,
+                "available_tools": None,
+                "enabled_tools": selected_tools,
+                "campaign_budget": campaign.campaign_budget,
+                "request_budget": max(0, (campaign.campaign_budget or 500) - (campaign.requests_used or 0)),
+                "request_engine": request_engine,
+            }
+            agent = VulnerabilityTestingAgent(campaign.id, session, vta_config)
+            auth_record = repo.get_authorization(campaign.id)
+            vta_result = await agent.run_vulnerability_pipeline(
+                target_url=target_url,
+                recon_snapshot=snapshot,
+                mode=ExecutionMode.AUTHORIZED_LIVE,
+                operator_id=auth_record.authorized_by if auth_record else None,
+                operator_approval_id=auth_record.id if auth_record else None,
+                in_scope_assets=in_scope or [target_url],
+                out_of_scope_assets=out_of_scope,
+                authorization_confirmed=bool(auth_record and auth_record.status == "ACTIVE"),
+                authorization_record_id=auth_record.id if auth_record else None,
+            )
+            serialized = vta_result.to_dict()
+            result["vulnerability_testing"] = serialized
+            report_evidence = vault.store_evidence(
+                campaign_id=campaign.id,
+                evidence_type="VULNERABILITY_TESTING_REPORT",
+                target_url=target_url,
+                method="VTA",
+                raw_request="VulnerabilityTestingAgent pipeline execution",
+                raw_response=json.dumps(serialized, sort_keys=True, default=str),
+                payload_summary=(
+                    f"registered={vta_result.total_registered}; executed={vta_result.executed_count}; "
+                    f"candidates={len(vta_result.findings)}; tool_results={len(vta_result.tool_results)}"
+                ),
+                task_id=task.id,
+            )
+            result["vulnerability_testing_evidence_id"] = report_evidence.id
+
+            # Campaign pipeline must verify VTA candidates before chain analysis.
+            # The agents query persisted Finding rows, so VTA evidence is available to
+            # VerifyAgent and only its VERIFIED verdicts can reach ExploitChainAgent.
+            from backend.agents.verify_agent import VerifyAgent
+            from backend.agents.exploit_chain_agent import ExploitChainAgent
+
+            verification_config = {
+                **recon_config,
+                "authorization_confirmed": bool(auth_record and auth_record.status == "ACTIVE"),
+                "rate_limit_rps": campaign.rate_limit_rps or 2,
+                "max_concurrency": campaign.max_concurrency or 1,
+                "in_scope_assets": in_scope or [target_url],
+                "out_of_scope_assets": out_of_scope,
+            }
+            verification_result = await VerifyAgent(campaign.id, session, verification_config).run()
+            result["verification"] = verification_result
+            verification_evidence = vault.store_evidence(
+                campaign_id=campaign.id,
+                evidence_type="VULNERABILITY_VERIFICATION_REPORT",
+                target_url=target_url,
+                method="VERIFY_AGENT",
+                raw_request="VerifyAgent evaluated VTA candidate findings",
+                raw_response=json.dumps(verification_result, sort_keys=True, default=str),
+                payload_summary=(
+                    f"verified={verification_result.get('verified', 0)}; "
+                    f"rejected={verification_result.get('rejected', 0)}; "
+                    f"inconclusive={verification_result.get('inconclusive', 0)}"
+                ),
+                task_id=task.id,
+            )
+            result["verification_evidence_id"] = verification_evidence.id
+
+            chain_result = await ExploitChainAgent(campaign.id, session, verification_config).run()
+            result["exploit_chain_analysis"] = chain_result
+            chain_evidence = vault.store_evidence(
+                campaign_id=campaign.id,
+                evidence_type="EXPLOIT_CHAIN_REPORT",
+                target_url=target_url,
+                method="EXPLOIT_CHAIN_AGENT",
+                raw_request="ExploitChainAgent received verified findings only",
+                raw_response=json.dumps(chain_result, sort_keys=True, default=str),
+                payload_summary=f"verified findings analyzed; chains={len(chain_result.get('chains', []))}",
+                task_id=task.id,
+            )
+            result["exploit_chain_evidence_id"] = chain_evidence.id
+
+        repo.append_audit_event(
+            campaign_id=campaign.id,
+            event_type="CAMPAIGN_PIPELINE_COMPLETED",
+            actor=self.worker_id,
+            object_id=task.id,
+            metadata={
+                "mode": campaign.mode,
+                "recon_status": snapshot.status,
+                "recon_snapshot_hash": snapshot.snapshot_hash,
+                "recon_evidence_id": result.get("recon_evidence_id"),
+                "vta_evidence_id": result.get("vulnerability_testing_evidence_id"),
+            },
+        )
+        result["request_counts"] = request_engine.request_counts
+        return result
 
     async def _heartbeat_loop(self, task_id: str, stop_event: asyncio.Event) -> None:
         """Background loop renewing worker lease and activity until task finishes."""

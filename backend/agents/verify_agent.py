@@ -5,7 +5,9 @@ from typing import Any, Optional
 
 from backend.agents.base_agent import BaseAgent
 from backend.core.scope_validator import ScopeValidator
+from backend.evidence.evidence_store import EvidenceVault
 from backend.models.database import Finding, Scan
+from backend.persistence.repository import CampaignRepository
 from backend.services.request_engine import AuthenticationContext, RequestEngine
 from backend.services.verification_engine import (
     VerificationConclusion,
@@ -22,7 +24,11 @@ class VerifyAgent(BaseAgent):
     async def execute(self) -> dict[str, Any]:
         findings = (
             self.db.query(Finding)
-            .filter_by(scan_id=self.scan_id, false_positive=False)
+            .filter(
+                Finding.scan_id == self.scan_id,
+                Finding.false_positive.is_(False),
+                Finding.verification_status.in_(("CANDIDATE", "DETECTED", "VALIDATED", "EXPLOITABLE")),
+            )
             .all()
         )
 
@@ -51,6 +57,8 @@ class VerifyAgent(BaseAgent):
         engine = VerificationEngine()
         auth_confirmed = bool(self.config.get("authorization_confirmed", True))
         auth_context = self._extract_auth_context()
+        repo = CampaignRepository(self.db)
+        evidence_vault = EvidenceVault(repo) if repo.get_campaign(self.scan_id) else None
 
         for i, finding in enumerate(findings):
             await self.check_cancelled()
@@ -65,6 +73,7 @@ class VerifyAgent(BaseAgent):
                 request_engine=request_engine,
                 auth_context=auth_context,
                 authorization_confirmed=auth_confirmed,
+                evidence_vault=evidence_vault,
             )
 
             if conclusion.status == VerificationStatus.VERIFIED:
@@ -120,9 +129,11 @@ class VerifyAgent(BaseAgent):
         request_engine = RequestEngine(scope_validator=validator)
         engine = VerificationEngine()
         auth_context = self._extract_auth_context()
+        repo = CampaignRepository(self.db)
         return await engine.verify_finding(
             finding=finding,
             request_engine=request_engine,
             auth_context=auth_context,
             authorization_confirmed=True,
+            evidence_vault=EvidenceVault(repo) if repo.get_campaign(self.scan_id) else None,
         )

@@ -6,11 +6,15 @@ and guarantee strict ScopeValidator gating before any transport interaction.
 
 import asyncio
 import hashlib
+import ipaddress
+import ssl
 import time
+from datetime import datetime, timedelta, timezone
 import pytest
 
 from backend.core.scope_validator import ScopeValidator
 from backend.services.request_engine import (
+    AiohttpTransport,
     AuthenticationContext,
     MockTransport,
     RawResponse,
@@ -69,7 +73,132 @@ async def test_1_in_scope_request_succeeds(engine, mock_transport):
     assert evidence.response_status == 200
     assert evidence.transport_error is None
     assert mock_transport.call_count == 1
+    assert engine.total_requests == 1
     assert "REQ-" in evidence.request_id
+
+
+@pytest.mark.asyncio
+async def test_request_accounting_counts_attempts_sends_denials_redirects_and_reuse():
+    transport = MockTransport()
+    transport.register_response(
+        url="https://api.example.com/start",
+        status_code=302,
+        headers={"location": "/finish"},
+        body="",
+    )
+    transport.register_response(url="https://api.example.com/finish", status_code=200, body="ok")
+    engine = RequestEngine(
+        scope_validator=ScopeValidator(in_scope_assets=["https://api.example.com"], allowed_ports=[443]),
+        transport=transport,
+    )
+
+    engine.record_reused()
+    denied = await engine.execute(RequestSpec(
+        url="https://api.example.com/denied",
+        authorization_confirmed=False,
+    ))
+    assert denied.success is False
+    followed = await engine.execute(RequestSpec(
+        url="https://api.example.com/start",
+        follow_redirects=True,
+    ))
+
+    assert followed.success is True
+    assert engine.request_counts == {
+        "attempted": 2,
+        "sent": 2,
+        "denied": 1,
+        "redirected": 1,
+        "reused": 1,
+    }
+
+
+@pytest.mark.asyncio
+async def test_budget_denied_redirect_is_not_counted_as_sent_or_redirected():
+    transport = MockTransport()
+    transport.register_response(
+        url="https://api.example.com/start",
+        status_code=302,
+        headers={"location": "/finish"},
+        body="",
+    )
+    engine = RequestEngine(
+        scope_validator=ScopeValidator(in_scope_assets=["https://api.example.com"], allowed_ports=[443]),
+        transport=transport,
+    )
+    reservations = 0
+
+    async def reserve(target, check_id):
+        nonlocal reservations
+        reservations += 1
+        return reservations == 1, "budget exhausted"
+
+    engine.request_budget_reserver = reserve
+    await engine.execute(RequestSpec(url="https://api.example.com/start", follow_redirects=True))
+
+    assert engine.request_counts == {
+        "attempted": 1,
+        "sent": 1,
+        "denied": 0,
+        "redirected": 0,
+        "reused": 0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_https_transport_validates_local_certificate_from_test_trust_store(tmp_path):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
+    now = datetime.now(timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=1))
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), critical=False)
+        .sign(key, hashes.SHA256())
+    )
+    cert_path, key_path = tmp_path / "test-cert.pem", tmp_path / "test-key.pem"
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ))
+    server_ssl = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server_ssl.load_cert_chain(str(cert_path), str(key_path))
+    client_ssl = ssl.create_default_context(cafile=str(cert_path))
+
+    async def handle(reader, writer):
+        while await reader.readline() not in (b"\r\n", b"\n", b""):
+            pass
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0, ssl=server_ssl)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        engine = RequestEngine(
+            scope_validator=ScopeValidator(in_scope_assets=[f"https://127.0.0.1:{port}"], allowed_ports=[port]),
+            transport=AiohttpTransport(ssl_context=client_ssl),
+        )
+        evidence = await engine.execute(RequestSpec(url=f"https://127.0.0.1:{port}/health"))
+        assert evidence.success is True
+        assert evidence.response_status == 200
+        assert evidence.response_body == "ok"
+        assert engine.request_counts["sent"] == 1
+    finally:
+        server.close()
+        await server.wait_closed()
 
 
 @pytest.mark.asyncio
@@ -85,6 +214,7 @@ async def test_2_out_of_scope_request_blocked_before_transport(engine, mock_tran
     assert evidence.response_status is None
     assert evidence.transport_error["error_type"] == "SCOPE_DENIED"
     assert mock_transport.call_count == 0  # CRITICAL: Zero transport calls!
+    assert engine.total_requests == 0
 
 
 @pytest.mark.asyncio

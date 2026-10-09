@@ -42,6 +42,12 @@ class C084OAuthRedirectURIValidation(BaseCheck):
     ) -> Optional[CheckResult]:
         parsed = urllib.parse.urlparse(target_url)
         params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+        oauth_path = any(token in parsed.path.lower() for token in ("oauth", "authorize", "/connect/"))
+        oauth_query = "client_id" in params and "response_type" in params
+        if not (oauth_path or oauth_query):
+            # Do not probe an ordinary application root and infer an OAuth issue from
+            # its generic single-page-app response.
+            return None
         
         # Test if target is an OAuth authorization endpoint or has redirect_uri
         untrusted_redirect = "https://evil-oauth-receiver.test/callback"
@@ -71,12 +77,20 @@ class C084OAuthRedirectURIValidation(BaseCheck):
         location = resp_evidence.response_headers.get("location", "")
 
         # If server redirected to untrusted URI or presented authorization dialog without rejecting redirect_uri
-        if untrusted_redirect in location or (status in (200, 302) and "invalid_request" not in location and "invalid_redirect" not in (resp_evidence.response_body or "")):
+        if untrusted_redirect in location or (
+            status in (200, 302)
+            and "application/json" in next(
+                (value for key, value in resp_evidence.response_headers.items() if key.lower() == "content-type"),
+                "",
+            ).lower()
+            and "invalid_request" not in location
+            and "invalid_redirect" not in (resp_evidence.response_body or "")
+        ):
             return CheckResult(
                 check_id=self.contract.id,
                 title=self.contract.name,
                 target=target_url,
-                affected_url=target_url,
+                affected_url=test_url,
                 vulnerability_type=self.contract.vulnerability_type,
                 severity=self.contract.severity,
                 candidate_reason=f"OAuth endpoint accepted untrusted redirect_uri '{untrusted_redirect}' without immediate 400 rejection.",

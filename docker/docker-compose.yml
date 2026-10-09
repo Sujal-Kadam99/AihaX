@@ -15,6 +15,25 @@ services:
       timeout: 5s
       retries: 3
 
+  zap:
+    # Pinned ZAP daemon for the internal VTA adapter. No host port is published.
+    image: ghcr.io/zaproxy/zaproxy:2.16.1
+    container_name: aihax-zap
+    restart: unless-stopped
+    command:
+      - zap.sh
+      - -daemon
+      - -host
+      - 0.0.0.0
+      - -port
+      - "8080"
+      - -config
+      - api.key=${AIHAX_ZAP_API_KEY:?Set AIHAX_ZAP_API_KEY in .env}
+      - -config
+      - api.addrs.addr.name=backend
+      - -config
+      - api.addrs.addr.regex=false
+
   backend:
     build:
       context: ..
@@ -31,6 +50,8 @@ services:
       - CHROMA_PATH=/app/db/chroma
       - REPORTS_PATH=/app/reports
       - CONFIG_PATH=/app/config
+      - AIHAX_ZAP_API_URL=http://zap:8080
+      - AIHAX_ZAP_API_KEY=${AIHAX_ZAP_API_KEY:?Set AIHAX_ZAP_API_KEY in .env}
     volumes:
       - ${AIHAX_REPORTS:-~/AihaX/Reports}:/app/reports
       - ${AIHAX_DB:-~/AihaX/db}:/app/db

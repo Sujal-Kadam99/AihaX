@@ -12,7 +12,7 @@ from backend.services.verification_engine import (
     VerificationStatus,
 )
 from backend.services.request_engine import RequestSpec, RequestTimeout
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urlparse
 
 
 class PathNormalizationVerificationStrategy(BaseVerificationStrategy):
@@ -27,52 +27,87 @@ class PathNormalizationVerificationStrategy(BaseVerificationStrategy):
     )
 
     NORMALIZATION_PROBES = [
-        ("/..;/", "Tomcat Matrix Parameter Semicolon (/..;/)"),
-        ("/%2e%2e/", "URL-encoded Dot Dot (/%2e%2e/)"),
-        ("/static/..%2fadmin", "Encoded Slash Traversal (..%2f)"),
+        ("/admin/..;/", "/admin/", "Tomcat Matrix Parameter Semicolon (/..;/)"),
+        ("/%2e%2e/", "/", "URL-encoded Dot Dot (/%2e%2e/)"),
+        ("/static/..%2fadmin", "/static/admin", "Encoded Slash Traversal (..%2f)"),
     ]
 
     async def verify(self, context: VerificationContext) -> VerificationConclusion:
         url = context.candidate_evidence.get("affected_url") or context.target_url
-        base = url.rstrip("/")
+        payload = context.candidate_evidence.get("payload")
+        parsed = urlparse(url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        selected = next((item for item in self.NORMALIZATION_PROBES if item[0] == payload), None)
+        probes = [selected] if selected else self.NORMALIZATION_PROBES
+        request_ids: list[str] = []
+        evidence_ids: list[str] = []
 
-        for path_suffix, desc in self.NORMALIZATION_PROBES:
-            probe_url = f"{base}{path_suffix}"
-            spec = RequestSpec(
-                url=probe_url,
+        for variant_path, baseline_path, desc in probes:
+            baseline = await context.send_verification_request(RequestSpec(
+                url=origin + baseline_path,
                 method="GET",
                 timeout=RequestTimeout(connect=5.0, read=10.0, total=15.0),
-            )
-            resp = await context.send_verification_request(spec)
-            if not resp or not resp.success:
+            ))
+            variant = await context.send_verification_request(RequestSpec(
+                url=origin + variant_path,
+                method="GET",
+                timeout=RequestTimeout(connect=5.0, read=10.0, total=15.0),
+            ))
+            request_ids.extend([baseline.request_id, variant.request_id])
+            if not baseline.success or not variant.success:
                 continue
 
-            # If the matrix or traversal probe produces a 200 OK with significant content
-            if resp.response_status == 200 and len(resp.response_body or "") > 50:
+            baseline_body = baseline.response_body or ""
+            variant_body = variant.response_body or ""
+            generic_spa = "<!doctype html" in variant_body.lower() and (
+                "juice shop" in variant_body.lower() or "<app-root" in variant_body.lower()
+            )
+            if (
+                baseline.response_status in (401, 403)
+                and variant.response_status == 200
+                and not generic_spa
+                and variant_body != baseline_body
+            ):
                 ev_id = context.record_evidence(
-                    evidence_type="path_normalization_inconsistency",
+                    evidence_type="protected_path_normalization_bypass",
                     data={
-                        "probe_url": probe_url,
-                        "variant": path_suffix,
-                        "desc": desc,
-                        "status_code": resp.response_status,
+                        "baseline_url": origin + baseline_path,
+                        "baseline_status": baseline.response_status,
+                        "variant_url": origin + variant_path,
+                        "variant_status": variant.response_status,
+                        "variant_differs_from_baseline": True,
                     },
-                    request_id=resp.request_id,
+                    request_id=variant.request_id,
                 )
+                evidence_ids.append(ev_id)
                 return VerificationConclusion(
                     status=VerificationStatus.VERIFIED,
                     reason_code=VerificationReasonCode.PROPERTY_DEMONSTRATED,
-                    reason_description=f"Path normalization discrepancy verified: URL variant '{path_suffix}' ({desc}) returned HTTP 200 OK.",
-                    evidence_ids=[ev_id],
-                    request_ids=[resp.request_id],
-                    confidence=85,
+                    reason_description=f"Canonical path returned HTTP {baseline.response_status}, while variant '{variant_path}' returned distinct HTTP 200 content.",
+                    evidence_ids=evidence_ids,
+                    request_ids=request_ids,
+                    confidence=90,
                 )
+
+            ev_id = context.record_evidence(
+                evidence_type="no_protected_access_bypass_observed",
+                data={
+                    "baseline_status": baseline.response_status,
+                    "variant_status": variant.response_status,
+                    "same_response_body": baseline_body == variant_body,
+                    "generic_spa_response": generic_spa,
+                },
+                request_id=variant.request_id,
+            )
+            evidence_ids.append(ev_id)
 
         return VerificationConclusion(
             status=VerificationStatus.FALSE_POSITIVE,
             reason_code=VerificationReasonCode.CONTROL_ENFORCED,
-            reason_description="Server/proxy correctly normalized or rejected matrix parameter and encoded traversal probes.",
-            confidence=85,
+            reason_description="No path variant bypassed an authentication/authorization response with distinct protected content; an HTTP 200 alone did not establish impact.",
+            evidence_ids=evidence_ids,
+            request_ids=request_ids,
+            confidence=90,
         )
 
 

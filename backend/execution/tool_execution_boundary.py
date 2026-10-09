@@ -77,6 +77,10 @@ class ExecutionProfile(str, Enum):
     DIRECTORY_DISCOVERY = "DIRECTORY_DISCOVERY"
     VULNERABILITY_SCANNING = "VULNERABILITY_SCANNING"
     XSS_VALIDATION = "XSS_VALIDATION"
+    OFFLINE_REFERENCE_LOOKUP = "OFFLINE_REFERENCE_LOOKUP"
+    BOUNDED_VULNERABILITY_CHECK = "BOUNDED_VULNERABILITY_CHECK"
+    BOUNDED_CONTENT_DISCOVERY = "BOUNDED_CONTENT_DISCOVERY"
+    BROWSER_HOOK_VALIDATION = "BROWSER_HOOK_VALIDATION"
 
 
 class CapabilityClass(str, Enum):
@@ -110,6 +114,7 @@ class ToolDefinition:
     max_stdout_bytes: int = 2 * 1024 * 1024  # 2 MB
     max_stderr_bytes: int = 512 * 1024        # 512 KB
     allowed_flags: Set[str] = field(default_factory=set)
+    strict_args: bool = False
 
 
 # Authoritative Tool Registry
@@ -234,6 +239,54 @@ ALLOWED_TOOLS: Dict[str, ToolDefinition] = {
         default_timeout=120,
         max_timeout=240,
         allowed_flags={"-u", "-silent", "-jc", "-d", "-duc", "-timeout", "-c", "-j", "-jsonl", "-H", "-fx", "-cos", "-form-extraction", "-crawl-out-scope"},
+    ),
+    "nikto": ToolDefinition(
+        name="nikto", executable="nikto", capability_class=CapabilityClass.VULNERABILITY_DETECTION,
+        allowed_profiles={ExecutionProfile.BOUNDED_VULNERABILITY_CHECK.value}, is_active=True,
+        default_timeout=180, max_timeout=300,
+        allowed_flags={"-h", "-host", "-maxtime", "-Tuning", "-nointeractive", "-Display", "-Pause"}, strict_args=True,
+    ),
+    "ffuf": ToolDefinition(
+        name="ffuf", executable="ffuf", capability_class=CapabilityClass.CONTENT_DISCOVERY,
+        allowed_profiles={ExecutionProfile.BOUNDED_CONTENT_DISCOVERY.value}, is_active=True,
+        default_timeout=90, max_timeout=120,
+        allowed_flags={"-w", "-u", "-rate", "-maxtime", "-t", "-mc", "-fc", "-of", "-s"}, strict_args=True,
+    ),
+    "dirsearch": ToolDefinition(
+        name="dirsearch", executable="dirsearch", capability_class=CapabilityClass.CONTENT_DISCOVERY,
+        allowed_profiles={ExecutionProfile.BOUNDED_CONTENT_DISCOVERY.value}, is_active=True,
+        default_timeout=90, max_timeout=120,
+        allowed_flags={"-u", "--url", "-w", "--wordlist", "--threads", "--max-rate", "--max-time", "--format", "--quiet"}, strict_args=True,
+    ),
+    "searchsploit": ToolDefinition(
+        name="searchsploit", executable="searchsploit", capability_class=CapabilityClass.PASSIVE_RECON,
+        allowed_profiles={ExecutionProfile.OFFLINE_REFERENCE_LOOKUP.value}, is_active=False,
+        requires_authorization=False, default_timeout=20, max_timeout=30,
+        allowed_flags={"--json", "--exact"}, strict_args=True,
+    ),
+    "sqlmap": ToolDefinition(
+        name="sqlmap", executable="sqlmap", capability_class=CapabilityClass.SPECIALIZED_ACTIVE_TESTING,
+        allowed_profiles={ExecutionProfile.BOUNDED_VULNERABILITY_CHECK.value}, is_active=True,
+        default_timeout=120, max_timeout=180,
+        allowed_flags={"-u", "--url", "-p", "--batch", "--smart", "--risk", "--level", "--threads", "--timeout", "--retries", "--technique", "--flush-session", "--delay"}, strict_args=True,
+    ),
+    "commix": ToolDefinition(
+        name="commix", executable="commix", capability_class=CapabilityClass.SPECIALIZED_ACTIVE_TESTING,
+        allowed_profiles={ExecutionProfile.BOUNDED_VULNERABILITY_CHECK.value}, is_active=True,
+        default_timeout=120, max_timeout=180,
+        allowed_flags={"--url", "--batch", "--level", "--risk", "--technique", "--timeout", "--retries", "--skip-heuristics", "--delay"}, strict_args=True,
+    ),
+    "metasploit": ToolDefinition(
+        name="metasploit", executable="msfconsole", capability_class=CapabilityClass.VULNERABILITY_DETECTION,
+        allowed_profiles={ExecutionProfile.BOUNDED_VULNERABILITY_CHECK.value}, is_active=True,
+        default_timeout=120, max_timeout=180,
+        allowed_flags={"-q", "-x"}, strict_args=True,
+    ),
+    "routersploit": ToolDefinition(
+        name="routersploit", executable="rsf", capability_class=CapabilityClass.VULNERABILITY_DETECTION,
+        allowed_profiles={ExecutionProfile.BOUNDED_VULNERABILITY_CHECK.value}, is_active=True,
+        default_timeout=90, max_timeout=120,
+        allowed_flags={"-m", "-s"}, strict_args=True,
     ),
 }
 
@@ -392,7 +445,7 @@ class ToolExecutionBoundary:
             )
 
         # 6. Validate Structured Arguments (Fail-closed on command injection metacharacters)
-        sanitized_args, arg_error = self._validate_and_sanitize_args(tool_def, request.args)
+        sanitized_args, arg_error = self._validate_and_sanitize_args(tool_def, request.args, request=request)
         if arg_error:
             return self._build_result(
                 execution_id=execution_id,
@@ -445,6 +498,18 @@ class ToolExecutionBoundary:
                 db=db,
             )
 
+        if self._custom_process_runner is None:
+            return self._build_result(
+                execution_id=execution_id,
+                request=request,
+                status=ToolExecutionStatus.BLOCKED_SAFETY.value,
+                error_category="Campaign-scoped Docker isolation, default-deny egress, and network telemetry are not configured; host subprocess execution is disabled.",
+                sanitized_args=sanitized_args,
+                started_at=started_at,
+                start_mono=start_mono,
+                db=db,
+            )
+
         # 9. Determine Timeout
         requested_timeout = request.timeout_seconds or tool_def.default_timeout
         timeout = min(max(1, requested_timeout), tool_def.max_timeout)
@@ -467,7 +532,7 @@ class ToolExecutionBoundary:
     # ==========================================================================
 
     def _validate_and_sanitize_args(
-        self, tool_def: ToolDefinition, args: List[str]
+        self, tool_def: ToolDefinition, args: List[str], request: Optional[ToolExecutionRequest] = None
     ) -> Tuple[List[str], Optional[str]]:
         """Validate argument list against allowed flags and reject dangerous characters."""
         sanitized: List[str] = []
@@ -476,6 +541,33 @@ class ToolExecutionBoundary:
                 return [], f"Non-string argument provided: {arg}"
 
             arg_str = arg.strip()
+
+            if tool_def.strict_args and arg_str.startswith("-"):
+                flag = arg_str.split("=", 1)[0]
+                if flag not in tool_def.allowed_flags:
+                    return [], f"Argument flag '{flag}' is not permitted for tool '{tool_def.name}'."
+            if tool_def.strict_args and arg_str.startswith(("http://", "https://")):
+                # URL arguments are safe as argv values (shell=False) only when independently
+                # validated against the same campaign scope and destination policy.
+                if request is None:
+                    return [], "URL argument requires a scope-bearing execution request."
+                url_scope = ScopeValidator(
+                    in_scope_assets=request.in_scope_assets or [request.target],
+                    out_of_scope_assets=request.out_of_scope_assets,
+                    allowed_ports=request.allowed_ports,
+                    excluded_ports=request.excluded_ports,
+                ).validate_target(arg_str)
+                url_safe, url_reason = validate_destination_safety(
+                    arg_str,
+                    allow_loopback=request.allow_loopback,
+                    allowed_ports=set(request.allowed_ports) if request.allowed_ports else None,
+                )
+                if not url_scope.allowed or not url_safe:
+                    return [], f"URL argument rejected: {url_scope.reason if not url_scope.allowed else url_reason}"
+                if any(ord(ch) < 32 for ch in arg_str):
+                    return [], "Control characters are not allowed in URL arguments."
+                sanitized.append(arg_str)
+                continue
 
             # Reject shell operators, metacharacters, or command chaining
             # Header values (e.g. following -H or starting with Cookie:, Authorization:, etc.) allow semicolons for cookie separation

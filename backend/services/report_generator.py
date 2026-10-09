@@ -13,10 +13,82 @@ from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.orm import Session
 
 from backend.models.database import ExploitChain, Finding, Scan
-from backend.persistence.models import Campaign
+from backend.persistence.models import Campaign, EvidenceRecord
 from backend.services.bug_bounty_generator import BugBountyReportGenerator
 
 logger = logging.getLogger(__name__)
+
+
+def _load_pipeline_evidence(db: Session, campaign_id: str) -> Dict[str, Any]:
+    """Read persisted recon/VTA manifests without presenting tool readiness as execution."""
+    records = (
+        db.query(EvidenceRecord)
+        .filter(
+            EvidenceRecord.campaign_id == campaign_id,
+            EvidenceRecord.evidence_type.in_(
+                [
+                    "CAMPAIGN_RECON_REPORT",
+                    "VULNERABILITY_TESTING_REPORT",
+                    "VULNERABILITY_VERIFICATION_REPORT",
+                    "EXPLOIT_CHAIN_REPORT",
+                ]
+            ),
+        )
+        .order_by(EvidenceRecord.created_at.asc())
+        .all()
+    )
+    recon = None
+    testing = None
+    verification = None
+    exploit_chains = None
+    for record in records:
+        try:
+            payload = json.loads(record.sanitized_response or "{}")
+        except (TypeError, ValueError):
+            payload = {}
+        item = {"evidence_id": record.id, "content_hash": record.content_hash}
+        if record.evidence_type == "CAMPAIGN_RECON_REPORT":
+            recon = {
+                **item,
+                "status": payload.get("status", "UNKNOWN"),
+                "snapshot_hash": payload.get("snapshot_hash", ""),
+                "observation_count": payload.get("observation_count", 0),
+                "observations": [
+                    {
+                        "category": row.get("category", "unknown"),
+                        "value": row.get("normalized_value") or row.get("value") or "",
+                        "discovered_by": row.get("discovered_by", []),
+                        "confidence": row.get("confidence"),
+                        "evidence_hash": row.get("evidence_hash"),
+                    }
+                    for row in payload.get("observations", [])
+                    if isinstance(row, dict)
+                ],
+                "tool_results": payload.get("tool_results", {}),
+            }
+        elif record.evidence_type == "VULNERABILITY_TESTING_REPORT":
+            coverage = payload.get("check_coverage", [])
+            counts: Dict[str, int] = {}
+            for row in coverage if isinstance(coverage, list) else []:
+                state = str(row.get("status", "UNKNOWN"))
+                counts[state] = counts.get(state, 0) + 1
+            testing = {
+                **item,
+                "total_registered": payload.get("total_registered", 0),
+                "executed_count": payload.get("executed_count", 0),
+                "coverage_counts": counts,
+                "tool_results": payload.get("tool_results", {}),
+                "tool_plan": payload.get("tool_plan", []),
+                "execution_statistics": payload.get("execution_statistics", {}),
+            }
+        elif record.evidence_type == "VULNERABILITY_VERIFICATION_REPORT":
+            verification = {**item, **payload}
+        elif record.evidence_type == "EXPLOIT_CHAIN_REPORT":
+            exploit_chains = {**item, **payload}
+    if testing is not None:
+        testing["verification"] = verification
+        testing["exploit_chain_analysis"] = exploit_chains
+    return {"recon": recon, "testing": testing, "verification": verification, "exploit_chains": exploit_chains}
 
 
 def _clean_text(s: Any) -> str:
@@ -412,6 +484,7 @@ def generate_scan_report(db: Session, scan_id: str, mode: Optional[str] = None) 
 
     created_at_val = getattr(target_obj, "created_at", None)
     completed_at_val = getattr(target_obj, "completed_at", None)
+    pipeline_evidence = _load_pipeline_evidence(db, scan_id)
 
     context = {
         "target_url": getattr(target_obj, "target_url", "N/A"),
@@ -433,6 +506,7 @@ def generate_scan_report(db: Session, scan_id: str, mode: Optional[str] = None) 
         "bug_bounty_findings": bug_bounty_findings,
         "exploit_chains": parsed_chains,
         "risk_score": risk_score,
+        "pipeline_evidence": pipeline_evidence,
     }
 
     # Setup Jinja2
@@ -532,6 +606,70 @@ def generate_markdown_report(scan_id: str, db: Session, mode: Optional[str] = "b
         "## Section A: Verified Security Vulnerabilities",
         "",
     ]
+
+    pipeline_evidence = _load_pipeline_evidence(db, scan_id)
+    recon_manifest = pipeline_evidence.get("recon")
+    vta_manifest = pipeline_evidence.get("testing")
+    if recon_manifest or vta_manifest:
+        lines.extend(["## Assessment Execution Evidence", ""])
+        if recon_manifest:
+            lines.extend([
+                f"- **Recon status:** {recon_manifest['status']}",
+                f"- **Recon observations:** {recon_manifest['observation_count']}",
+                f"- **Recon snapshot hash:** `{recon_manifest['snapshot_hash'] or 'unavailable'}`",
+                f"- **Recon evidence:** `{recon_manifest['evidence_id']}` (SHA-256 `{recon_manifest['content_hash']}`)",
+            ])
+            lines.append("- **Observed attack surface:**")
+            if recon_manifest.get("observations"):
+                for observation in recon_manifest["observations"]:
+                    source = ", ".join(observation.get("discovered_by") or []) or "unknown source"
+                    lines.append(f"  - `{observation['category']}` `{observation['value']}` (source: {source})")
+            else:
+                lines.append("  - No normalized observations were captured in the stored snapshot.")
+            lines.append("- **Recon tool outcomes:**")
+            for name, tool in sorted((recon_manifest.get("tool_results") or {}).items()):
+                if isinstance(tool, dict):
+                    lines.append(f"  - `{name}`: {tool.get('status', 'UNKNOWN')} — {tool.get('reason', 'No reason supplied.')}")
+                else:
+                    lines.append(f"  - `{name}`: result recorded")
+            lines.append("")
+        if vta_manifest:
+            lines.extend([
+                f"- **Vulnerability checks registered:** {vta_manifest['total_registered']}",
+                f"- **Vulnerability hypotheses executed:** {vta_manifest['executed_count']}",
+                f"- **Check coverage statuses:** `{json.dumps(vta_manifest['coverage_counts'], sort_keys=True)}`",
+                f"- **VTA evidence:** `{vta_manifest['evidence_id']}` (SHA-256 `{vta_manifest['content_hash']}`)",
+                "- **Vulnerability tool outcomes:**",
+            ])
+            for name, tool in sorted((vta_manifest.get("tool_results") or {}).items()):
+                if isinstance(tool, dict):
+                    lines.append(f"  - `{name}`: {tool.get('status', 'UNKNOWN')} — {tool.get('reason', 'No reason supplied.')}")
+                else:
+                    lines.append(f"  - `{name}`: result recorded")
+            if vta_manifest.get("tool_plan"):
+                lines.append("- **Hypothesis-driven tool decisions:**")
+                for decision in vta_manifest["tool_plan"]:
+                    ids = ", ".join(decision.get("hypothesis_ids") or []) or ", ".join(decision.get("check_ids") or []) or "campaign-level"
+                    lines.append(
+                        f"  - `{decision.get('tool', 'unknown')}` for `{ids}`: "
+                        f"{decision.get('decision', 'UNKNOWN')} — "
+                        f"{decision.get('rationale', decision.get('outcome_reason', 'No reason supplied.'))}"
+                    )
+            verification = vta_manifest.get("verification") or {}
+            if verification:
+                lines.append(
+                    f"- **VerifyAgent:** {verification.get('verified', 0)} verified, "
+                    f"{verification.get('rejected', 0)} rejected, "
+                    f"{verification.get('inconclusive', 0)} inconclusive. "
+                    f"Evidence `{verification.get('evidence_id', 'unavailable')}`."
+                )
+            chains = vta_manifest.get("exploit_chain_analysis") or {}
+            if chains:
+                lines.append(
+                    f"- **ExploitChainAgent:** {len(chains.get('chains', []))} chain(s) analyzed from verified findings only. "
+                    f"Evidence `{chains.get('evidence_id', 'unavailable')}`."
+                )
+            lines.append("")
 
     if not verified_vulnerabilities:
         lines.append("No verified vulnerabilities meeting quality reporting criteria were identified during this assessment.")

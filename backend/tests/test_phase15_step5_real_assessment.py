@@ -77,7 +77,7 @@ from backend.services.campaign_operations import (
     ScopeMismatchException,
 )
 from backend.services.campaign_worker import CampaignWorker
-from backend.services.report_generator import generate_scan_report
+from backend.services.report_generator import generate_markdown_report, generate_scan_report
 from backend.services.request_engine import (
     MockTransport,
     RawResponse,
@@ -597,6 +597,90 @@ def test_22_report_generation_with_integrity_hashes(ops, repo, db_session):
     pdf_bytes = generate_scan_report(db_session, campaign.id)
     assert len(pdf_bytes) > 500
     assert pdf_bytes.startswith(b"%PDF-")
+
+    vault = EvidenceVault(repo)
+    vault.store_evidence(
+        campaign.id,
+        "CAMPAIGN_RECON_REPORT",
+        campaign.target_url,
+        method="RECON",
+        raw_response=json.dumps({
+            "status": "COMPLETED",
+            "snapshot_hash": "recon-hash-proof",
+            "observation_count": 3,
+            "tool_results": {"http_probe": {"status": "SUCCESS", "reason": "HTTP 200"}},
+        }),
+    )
+    vault.store_evidence(
+        campaign.id,
+        "VULNERABILITY_TESTING_REPORT",
+        campaign.target_url,
+        method="VTA",
+        raw_response=json.dumps({
+            "total_registered": 86,
+            "executed_count": 2,
+            "check_coverage": [{"status": "EXECUTED_NO_FINDING"}],
+            "tool_results": {"nikto": {"status": "NOT_SELECTED", "reason": "Operator did not select Nikto."}},
+        }),
+    )
+    markdown = generate_markdown_report(campaign.id, db_session)
+    assert "## Assessment Execution Evidence" in markdown
+    assert "COMPLETED" in markdown and "recon-hash-proof" in markdown
+    assert "nikto`" in markdown and "NOT_SELECTED" in markdown
+
+
+@pytest.mark.asyncio
+async def test_recon_only_pipeline_persists_snapshot_and_does_not_invoke_vta(ops, repo, db_session, monkeypatch):
+    """RECON_ONLY persists recon evidence and stops before vulnerability testing."""
+    from types import SimpleNamespace
+
+    from backend.agents import recon_agent
+    from backend.services.campaign_worker import CampaignWorker
+
+    campaign = ops.create_campaign(name="Recon Pipeline Test", target_url="http://127.0.0.1:8080", mode="RECON_ONLY")
+    db_session.commit()
+    ops.authorize_campaign(campaign.id, "lead_auditor")
+    db_session.commit()
+    task = SimpleNamespace(id="recon-task", check_id="PIPELINE_RECON_ONLY")
+    snapshot = SimpleNamespace(
+        status="COMPLETED",
+        snapshot_hash="snapshot-hash-proof",
+        observation_count=1,
+        tool_results={"http_probe": {"status": "SUCCESS"}},
+        to_dict=lambda: {
+            "status": "COMPLETED",
+            "snapshot_hash": "snapshot-hash-proof",
+            "observation_count": 1,
+            "observations": [{"category": "ENDPOINT", "normalized_value": "http://127.0.0.1:8080/", "discovered_by": ["http_probe"]}],
+            "tool_results": {"http_probe": {"status": "SUCCESS"}},
+        },
+    )
+
+    class FakeReconAgent:
+        def __init__(self, *_args):
+            self.recon_snapshot = snapshot
+
+        async def execute(self):
+            return {"status": "COMPLETED"}
+
+    monkeypatch.setattr(recon_agent, "ReconAgent", FakeReconAgent)
+    worker = CampaignWorker(session_factory=lambda: db_session)
+    result = await worker._execute_pipeline_task(
+        campaign=campaign,
+        task=task,
+        session=db_session,
+        repo=repo,
+        vault=EvidenceVault(repo),
+        target_url=campaign.target_url,
+        in_scope=[campaign.target_url],
+        out_of_scope=[],
+    )
+
+    assert result["recon_status"] == "COMPLETED"
+    assert result["vulnerability_testing"] is None
+    assert db_session.query(EvidenceRecord).filter_by(
+        campaign_id=campaign.id, evidence_type="CAMPAIGN_RECON_REPORT"
+    ).count() == 1
 
 
 def test_23_evidence_manifest_integrity(ops, repo, db_session):

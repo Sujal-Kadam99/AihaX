@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     whatweb \
     sqlmap \
+    nikto \
+    ffuf \
+    exploitdb \
     ca-certificates \
     libnss3 \
     libnspr4 \
@@ -50,6 +53,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends gobuster \
 # Copy and install Python dependencies
 COPY backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Bounded content-discovery and command-injection adapters. Pin dirsearch and
+# Commix revisions so image rebuilds do not silently change scanner behavior.
+RUN pip install --no-cache-dir dirsearch==0.4.3 \
+    && git clone --depth 1 --branch v4.1 https://github.com/commixproject/commix.git /opt/commix \
+    && chmod 0755 /opt/commix/commix.py \
+    && ln -s /opt/commix/commix.py /usr/local/bin/commix
 
 # Install Playwright Chromium
 RUN playwright install chromium --with-deps

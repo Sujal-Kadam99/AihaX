@@ -1,7 +1,7 @@
 """AihaX Production-Safe Bug Bounty Execution & Evidence Pipeline Orchestrator.
 
 Architectural Guarantees:
-1. Strict Pipeline: Campaign -> Scope -> Asset Normalization -> Target Selection -> Check Planning -> Request Budget -> RequestEngine -> C001–C077 -> Candidate Evidence -> VerificationEngine -> Deduplication -> Finding -> Severity + Confidence -> Bug-Bounty Report.
+1. Strict Pipeline: Campaign -> Scope -> Asset Normalization -> Target Selection -> Check Planning -> Request Budget -> RequestEngine -> registered checks -> Candidate Evidence -> VerificationEngine -> Deduplication -> Finding -> Severity + Confidence -> Bug-Bounty Report.
 2. Default-Deny Scope: Out-of-scope targets produce ZERO network requests.
 3. Centralized RequestEngine: All network activity strictly routes through RequestEngine.
 4. Bounded Concurrency & Hierarchical Request Budgets: Campaign, Target, and Check limits.
@@ -31,7 +31,7 @@ from backend.core.check_registry import (
     CheckResult,
     registry,
 )
-import backend.agents.checks  # Ensure all 77 checks are loaded in registry
+import backend.agents.checks  # Ensure all registered checks are loaded in registry
 from backend.core.scope_validator import (
     ScopeDecision,
     ScopeStatus,

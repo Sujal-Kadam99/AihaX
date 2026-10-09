@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy.orm import Session
 
-import backend.agents.checks  # Ensure all 77 checks are registered
+import backend.agents.checks  # Ensure the check registry is populated
 from backend.core.check_registry import registry
 from backend.core.scope_validator import ScopeValidator, normalize_url, validate_concrete_target_url, validate_destination_safety
 from backend.evidence.evidence_manifest import (
@@ -159,6 +159,7 @@ class CampaignOperationsService:
         user_id: Optional[str] = None,
         in_scope_assets: Optional[List[str]] = None,
         selected_checks: Optional[List[str]] = None,
+        selected_tools: Optional[List[str]] = None,
         assessment_mode: str = "CONTROLLED",
         awaiting_target: bool = False,
     ) -> Campaign:
@@ -212,6 +213,8 @@ class CampaignOperationsService:
         scope_hash = hashlib.sha256(scope_canonical.encode("utf-8")).hexdigest()
 
         reg_meta = registry.get_registry_metadata()
+        from backend.services.vulnerability_tool_policy import normalize_tool_selections
+        normalized_tools = normalize_tool_selections(selected_tools if selected_tools is not None else ["zap"])
         snapshot_data = {
             "campaign_id": campaign.id,
             "name": name,
@@ -220,6 +223,7 @@ class CampaignOperationsService:
             "scope_assets": sorted(all_targets),
             "scope_hash": scope_hash,
             "selected_checks": selected_checks or reg_meta["check_ids"],
+            "selected_tools": normalized_tools,
             "registry_version": reg_meta["registry_version"],
             "registry_hash": reg_meta["registry_hash"],
             "contract_hash": reg_meta["contract_hash"],
@@ -439,6 +443,15 @@ class CampaignOperationsService:
                         selected_checks = snap_dict.get("selected_checks") or selected_checks
                     except Exception:
                         pass
+
+                # Pipeline modes are single, ordered jobs. Recon-only must never enqueue
+                # individual vulnerability checks; SAFE_SCAN performs recon once and then
+                # hands its snapshot to VTA.
+                pipeline_mode = str(campaign.mode or "SAFE_SCAN").upper()
+                if pipeline_mode == "RECON_ONLY":
+                    selected_checks = ["PIPELINE_RECON_ONLY"]
+                elif pipeline_mode in {"SAFE_SCAN", "VULNERABILITY_TESTING", "FULL_ASSESSMENT"}:
+                    selected_checks = ["PIPELINE_RECON_THEN_VTA"]
 
                 task_specs = []
                 if targets:

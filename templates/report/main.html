@@ -274,6 +274,57 @@
 </table>
 {% endif %}
 
+{% if pipeline_evidence and (pipeline_evidence.recon or pipeline_evidence.testing) %}
+<h2>Assessment Execution Evidence</h2>
+<p>This section records what the pipeline reports as executed. Tool availability alone is not evidence of a scan.</p>
+{% if pipeline_evidence.recon %}
+<p><strong>Recon:</strong> {{ pipeline_evidence.recon.status }}; {{ pipeline_evidence.recon.observation_count }} observations;
+snapshot <code>{{ pipeline_evidence.recon.snapshot_hash or 'unavailable' }}</code>;
+evidence <code>{{ pipeline_evidence.recon.evidence_id }}</code>.</p>
+<p><strong>Observed attack surface</strong></p>
+<ul>
+{% for observation in pipeline_evidence.recon.observations %}
+<li><code>{{ observation.category }}</code> {{ observation.value }} ({{ observation.discovered_by|join(', ') or 'unknown source' }})</li>
+{% else %}
+<li>No normalized observations were captured in the stored snapshot.</li>
+{% endfor %}
+</ul>
+<ul>
+{% for name, tool in pipeline_evidence.recon.tool_results|dictsort %}
+<li><strong>{{ name }}:</strong> {{ tool.status if tool is mapping else 'RESULT_RECORDED' }}{% if tool is mapping and tool.reason %} — {{ tool.reason }}{% endif %}</li>
+{% endfor %}
+</ul>
+{% endif %}
+{% if pipeline_evidence.testing %}
+<p><strong>Vulnerability testing:</strong> {{ pipeline_evidence.testing.executed_count }} hypotheses executed of
+{{ pipeline_evidence.testing.total_registered }} registered checks; evidence <code>{{ pipeline_evidence.testing.evidence_id }}</code>.</p>
+<p>Coverage statuses: {{ pipeline_evidence.testing.coverage_counts }}</p>
+<ul>
+{% for name, tool in pipeline_evidence.testing.tool_results|dictsort %}
+<li><strong>{{ name }}:</strong> {{ tool.status if tool is mapping else 'RESULT_RECORDED' }}{% if tool is mapping and tool.reason %} — {{ tool.reason }}{% endif %}</li>
+{% endfor %}
+</ul>
+{% if pipeline_evidence.testing.tool_plan %}
+<p><strong>Hypothesis-driven tool decisions</strong></p>
+<ul>
+{% for decision in pipeline_evidence.testing.tool_plan %}
+<li><strong>{{ decision.tool }}:</strong> {{ decision.decision }} — {{ decision.rationale }}{% if decision.hypothesis_ids %}<br><small>Hypotheses: {{ decision.hypothesis_ids|join(', ') }}</small>{% elif decision.check_ids %}<br><small>Checks: {{ decision.check_ids|join(', ') }}</small>{% endif %}</li>
+{% endfor %}
+</ul>
+{% endif %}
+{% if pipeline_evidence.testing.verification %}
+<p><strong>VerifyAgent:</strong> {{ pipeline_evidence.testing.verification.verified or 0 }} verified,
+{{ pipeline_evidence.testing.verification.rejected or 0 }} rejected,
+{{ pipeline_evidence.testing.verification.inconclusive or 0 }} inconclusive.
+Evidence <code>{{ pipeline_evidence.testing.verification.evidence_id }}</code>.</p>
+{% endif %}
+{% if pipeline_evidence.testing.exploit_chain_analysis %}
+<p><strong>ExploitChainAgent:</strong> {{ pipeline_evidence.testing.exploit_chain_analysis.chains|length }} chain(s) analyzed from verified findings only.
+Evidence <code>{{ pipeline_evidence.testing.exploit_chain_analysis.evidence_id }}</code>.</p>
+{% endif %}
+{% endif %}
+{% endif %}
+
 <!-- ═══════════════════════════════════════════ EXPLOIT CHAINS ═══════════ -->
 {% if exploit_chains and (report_mode in ['executive', 'full'] or not report_mode) %}
 <h1 class="page-break">Exploit Chain Analysis</h1>

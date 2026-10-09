@@ -50,6 +50,7 @@ from backend.execution.tool_execution_boundary import (
     ToolExecutionStatus,
 )
 from backend.models.database import Scan, get_utc_now
+from backend.services.request_engine import RequestEngine
 from backend.services.attack_surface_graph import (
     AttackSurfaceEdgeType,
     AttackSurfaceGraphEngine,
@@ -221,6 +222,7 @@ class ReconAgent(BaseAgent):
         tool_boundary: Optional[ToolExecutionBoundary] = None,
         dns_resolver: Optional[Callable[[str], Dict[str, List[str]]]] = None,
         tls_inspector: Optional[Callable[[str, int], Dict[str, Any]]] = None,
+        request_engine: Optional[RequestEngine] = None,
     ) -> None:
         self.scan_id = scan_id or "default-scan"
         self.db = db
@@ -228,6 +230,7 @@ class ReconAgent(BaseAgent):
         self.tool_boundary = tool_boundary or ToolExecutionBoundary()
         self.dns_resolver = dns_resolver
         self.tls_inspector = tls_inspector
+        self.request_engine = request_engine
 
     async def execute(self) -> Dict[str, Any]:
         """Execute recon pipeline in backwards-compatible mode for BaseAgent."""
@@ -235,7 +238,7 @@ class ReconAgent(BaseAgent):
         cfg = ReconExecutionConfig(
             campaign_id=self.scan_id,
             target_url=target_url,
-            authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+            authorization_confirmed=bool(self.config.get("authorization_confirmed", False)),
             in_scope_assets=self.config.get("in_scope_assets", [target_url] if target_url else []),
             out_of_scope_assets=self.config.get("out_of_scope_assets", []),
             allowed_ports=self.config.get("allowed_ports", []),
@@ -250,7 +253,7 @@ class ReconAgent(BaseAgent):
             enable_tls_analysis=bool(self.config.get("enable_tls_analysis", True)),
             timeout_per_tool=int(self.config.get("timeout_per_tool", 60)),
             allow_loopback=bool(self.config.get("allow_loopback", False)),
-            execution_mode=str(self.config.get("execution_mode", "AUTHORIZED_LIVE_RECON" if bool(self.config.get("authorization_confirmed", True)) else "AUDIT")),
+            execution_mode=str(self.config.get("execution_mode", "AUDIT")),
             wordlist_path=Path(self.config["wordlist_path"]) if "wordlist_path" in self.config else _DEFAULT_WORDLIST,
         )
 
@@ -395,6 +398,65 @@ class ReconAgent(BaseAgent):
                 metadata={"target_url": target_url, "scheme": parsed_target.scheme, "port": port},
             )
         )
+
+        # AihaX-managed HTTP traffic uses the same scope, counters, and evidence engine as VTA.
+        if self.request_engine is not None:
+            from backend.recon.orchestrator import ReconOrchestrator
+
+            self.request_engine.current_target_url = target_url
+            self.request_engine.current_check_id = "RECON"
+            self.request_engine.current_phase = "RECON"
+            http_result = await ReconOrchestrator(
+                request_engine=self.request_engine,
+                scope_validator=self.request_engine.scope_validator,
+                max_crawl_depth=2,
+                max_endpoints_per_asset=100,
+            ).execute_reconnaissance(
+                campaign_id=config.campaign_id,
+                target_domain=target_url,
+                seed_assets=[target_url],
+                enable_subdomain_discovery=False,
+            )
+            tool_results["aihax_http_recon"] = {
+                "status": "COMPLETED",
+                "requests_used": http_result.recon_requests_used,
+                "endpoint_count": len(http_result.endpoints),
+                "technology_count": len(http_result.technologies),
+            }
+            for endpoint in http_result.endpoints:
+                endpoint_url = endpoint.url
+                raw_observations.append(ReconObservation(
+                    category=ReconObservationCategory.ENDPOINT.value,
+                    value=endpoint_url,
+                    normalized_value=canonicalize_url(endpoint_url),
+                    discovered_by=["aihax_request_engine", endpoint.source.value],
+                    metadata={"method": endpoint.method, "parameter_locations": getattr(endpoint, "parameter_locations", {})},
+                ))
+                for parameter in endpoint.parameters:
+                    raw_observations.append(ReconObservation(
+                        category=ReconObservationCategory.PARAMETER.value,
+                        value=parameter,
+                        normalized_value=parameter.lower(),
+                        discovered_by=["aihax_request_engine", endpoint.source.value],
+                        metadata={
+                            "endpoint": canonicalize_url(endpoint_url),
+                            "location": next(
+                                (loc for loc, values in getattr(endpoint, "parameter_locations", {}).items() if parameter in values),
+                                "query" if "?" in endpoint_url else "unknown",
+                            ),
+                            "method": endpoint.method,
+                            "source": endpoint.source.value,
+                        },
+                    ))
+            for technology in http_result.technologies:
+                raw_observations.append(ReconObservation(
+                    category=ReconObservationCategory.TECHNOLOGY.value,
+                    value=technology.name + (f" {technology.version}" if technology.version else ""),
+                    normalized_value=technology.name.lower(),
+                    discovered_by=["aihax_request_engine"],
+                    confidence=0.8,
+                    metadata={"version": technology.version, "evidence": technology.evidence_snippet},
+                ))
 
         # 5. Subdomain Enumeration (Passive: Subfinder & Amass)
         if config.enable_subdomain_discovery:
@@ -640,7 +702,6 @@ class ReconAgent(BaseAgent):
             self._analyze_tls(domain, port, raw_observations)
 
         # 12. Parameter Seed Fallback for discovered endpoints
-        raw_observations.extend(self._seed_parameter_fallback(raw_observations, config.target_url))
 
         # 13. Deduplication & Provenance Aggregation
         deduped_observations = self._deduplicate_observations(raw_observations)
@@ -718,7 +779,7 @@ class ReconAgent(BaseAgent):
                 katana_args.extend(["-H", f"{k}: {v}"])
 
         in_scope = self.config.get("in_scope_assets", [target_url])
-        exec_mode = str(self.config.get("execution_mode", "AUTHORIZED_LIVE_RECON" if bool(self.config.get("authorization_confirmed", True)) else "AUDIT"))
+        exec_mode = str(self.config.get("execution_mode", "AUDIT"))
         katana_res = await self.tool_boundary.execute(
             ToolExecutionRequest(
                 campaign_id=self.scan_id,
@@ -727,7 +788,7 @@ class ReconAgent(BaseAgent):
                 execution_profile=ExecutionProfile.URL_DISCOVERY.value,
                 args=katana_args,
                 timeout_seconds=int(self.config.get("timeout_per_tool", 60)) * 2,
-                authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+                authorization_confirmed=bool(self.config.get("authorization_confirmed", False)),
                 execution_mode=exec_mode,
                 in_scope_assets=in_scope,
                 out_of_scope_assets=self.config.get("out_of_scope_assets", []),
@@ -750,7 +811,6 @@ class ReconAgent(BaseAgent):
         # Merge observations into current snapshot
         base_observations = list(self.recon_snapshot.observations) if self.recon_snapshot else []
         all_observations = base_observations + new_observations
-        all_observations.extend(self._seed_parameter_fallback(all_observations, target_url))
         deduped_observations = self._deduplicate_observations(all_observations)
 
         # Re-populate Attack Surface Graph
@@ -758,7 +818,7 @@ class ReconAgent(BaseAgent):
             campaign_id=self.scan_id,
             target_url=target_url,
             allow_loopback=bool(self.config.get("allow_loopback", False)),
-            authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+            authorization_confirmed=bool(self.config.get("authorization_confirmed", False)),
             execution_mode=exec_mode,
         )
         graph_snapshot = self._populate_attack_surface_graph(
@@ -813,53 +873,6 @@ class ReconAgent(BaseAgent):
     # Parsing, Normalization & Graph Integration Helpers
     # ==========================================================================
 
-    def _seed_parameter_fallback(self, observations: List[ReconObservation], base_target: str) -> List[ReconObservation]:
-        """Seed candidate parameters for endpoints (e.g. /vulnerabilities/) lacking discovered parameters."""
-        seeded: List[ReconObservation] = []
-        
-        endpoints = [
-            o for o in observations
-            if o.category in (
-                ReconObservationCategory.ENDPOINT.value,
-                ReconObservationCategory.DIRECTORY.value,
-                ReconObservationCategory.HISTORICAL_URL.value,
-            )
-        ]
-        
-        common_candidates = ["id", "name", "ip", "query", "search", "page", "user", "email"]
-        
-        for ep_obs in endpoints:
-            ep_url = ep_obs.normalized_value
-            ep_lower = ep_url.lower()
-            
-            # Target endpoints matching /vulnerabilities/ or interactive web paths
-            if "/vulnerabilities/" in ep_lower or "/api/" in ep_lower:
-                subpath_params = []
-                if "sqli" in ep_lower:
-                    subpath_params = ["id", "user", "cat"]
-                elif "xss" in ep_lower:
-                    subpath_params = ["name", "query", "msg"]
-                elif "exec" in ep_lower:
-                    subpath_params = ["ip", "cmd"]
-                elif "fi" in ep_lower:
-                    subpath_params = ["page", "file"]
-                elif "brute" in ep_lower:
-                    subpath_params = ["username", "password"]
-                else:
-                    subpath_params = common_candidates[:4]
-                    
-                for param in subpath_params:
-                    seeded.append(
-                        ReconObservation(
-                            category=ReconObservationCategory.PARAMETER.value,
-                            value=param,
-                            normalized_value=param.lower(),
-                            discovered_by=["parameter_seed_fallback"],
-                            metadata={"endpoint": ep_url, "source": "parameter_seed_fallback"},
-                        )
-                    )
-        return seeded
-
     def _parse_katana_output(
         self,
         stdout: str,
@@ -906,7 +919,7 @@ class ReconAgent(BaseAgent):
                                         value=p_clean,
                                         normalized_value=p_clean.lower(),
                                         discovered_by=[source_tag],
-                                        metadata={"source": "query_param", "endpoint": canon},
+                                        metadata={"source": "query_param", "endpoint": canon, "location": "query"},
                                         evidence_hash=evidence_hash,
                                     )
                                 )
@@ -931,7 +944,7 @@ class ReconAgent(BaseAgent):
                                             value=fname.strip(),
                                             normalized_value=fname.strip().lower(),
                                             discovered_by=[source_tag],
-                                            metadata={"source": "form_field", "endpoint": canon},
+                                            metadata={"source": "form_field", "endpoint": canon, "location": "body"},
                                             evidence_hash=evidence_hash,
                                         )
                                     )
@@ -944,7 +957,7 @@ class ReconAgent(BaseAgent):
                                             value=fname.strip(),
                                             normalized_value=fname.strip().lower(),
                                             discovered_by=[source_tag],
-                                            metadata={"source": "form_field", "endpoint": canon},
+                                            metadata={"source": "form_field", "endpoint": canon, "location": "body"},
                                             evidence_hash=evidence_hash,
                                         )
                                     )

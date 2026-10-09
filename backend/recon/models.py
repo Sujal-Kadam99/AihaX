@@ -104,6 +104,7 @@ class DiscoveredEndpoint:
     endpoint_type: EndpointType = EndpointType.PAGE
     source: DiscoverySource = DiscoverySource.HTML_CRAWL
     parameters: list[str] = field(default_factory=list)
+    parameter_locations: dict[str, list[str]] = field(default_factory=dict)
     auth_required: AuthRequirement = AuthRequirement.UNKNOWN
     content_type: Optional[str] = None
     status_code: Optional[int] = None

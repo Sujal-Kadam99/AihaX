@@ -243,6 +243,7 @@ class VerificationContext:
         if not spec.auth_context and self.auth_context:
             spec.auth_context = self.auth_context
 
+        synthetic_response = False
         if hasattr(self.request_engine, "execute"):
             if asyncio.iscoroutinefunction(self.request_engine.execute):
                 evidence = await self.request_engine.execute(spec)
@@ -277,6 +278,7 @@ class VerificationContext:
                 )
         elif self.request_engine is None:
             # Offline synthetic mock response from candidate evidence
+            synthetic_response = True
             proof_resp = str(self.candidate_evidence.get("proof_response") or "")
             resp_headers = {}
             for line in proof_resp.splitlines():
@@ -311,12 +313,26 @@ class VerificationContext:
         self.record_evidence(
             evidence_type="verification_http_request",
             data={
-                "url": evidence.url,
-                "method": evidence.method,
-                "status": evidence.response_status,
+                "request": {
+                    "url": evidence.url,
+                    "method": evidence.method,
+                    "headers": evidence.request_headers,
+                    "body": evidence.request_body,
+                },
+                "response": {
+                    "status": evidence.response_status,
+                    "headers": evidence.response_headers,
+                    "body": evidence.response_body,
+                    "size": evidence.response_size,
+                    "truncated": evidence.truncated,
+                },
                 "success": evidence.success,
-                "truncated": evidence.truncated,
+                "synthetic": synthetic_response,
                 "transport_error": evidence.transport_error,
+                "redirect_chain": evidence.redirect_chain,
+                "scope_decision": evidence.scope_decision,
+                "request_hash": evidence.request_hash,
+                "response_hash": evidence.response_hash,
             },
             request_id=evidence.request_id,
         )
@@ -2007,6 +2023,7 @@ class VerificationEngine:
         auth_context: Optional[AuthenticationContext] = None,
         budget: Optional[VerificationBudget] = None,
         authorization_confirmed: bool = True,
+        evidence_vault: Any = None,
     ) -> VerificationConclusion:
         """Deterministically verify a candidate finding and update its audit record."""
         # 1. Product Safety Check: Authorization
@@ -2071,7 +2088,31 @@ class VerificationEngine:
             )
 
         # 6. Traceability and Finding Update
-        all_evidence_ids = list(set(conclusion.evidence_ids + [item.evidence_id for item in context.collected_evidence]))
+        persisted_ids: dict[str, str] = {}
+        if evidence_vault is not None:
+            import json
+            for item in context.collected_evidence:
+                entry = evidence_vault.store_evidence(
+                    campaign_id=finding.scan_id,
+                    evidence_type=f"VERIFICATION_{item.evidence_type}".upper(),
+                    target_url=finding.affected_url or context.target_url,
+                    method=str(item.data.get("method") or "GET"),
+                    raw_request=json.dumps({
+                        "request_id": item.request_id,
+                        "evidence_type": item.evidence_type,
+                        "method": item.data.get("method"),
+                        "url": item.data.get("url"),
+                    }),
+                    raw_response=json.dumps(item.data, sort_keys=True, default=str),
+                    finding_id=finding.id,
+                    request_id=item.request_id,
+                )
+                persisted_ids[item.evidence_id] = entry.id
+
+        all_evidence_ids = list(set(
+            [persisted_ids.get(evidence_id, evidence_id) for evidence_id in conclusion.evidence_ids]
+            + [persisted_ids.get(item.evidence_id, item.evidence_id) for item in context.collected_evidence]
+        ))
         all_request_ids = list(set(conclusion.request_ids + [item.request_id for item in context.collected_evidence if item.request_id]))
 
         conclusion.evidence_ids = all_evidence_ids
@@ -2092,16 +2133,54 @@ class VerificationEngine:
             if not conclusion.evidence_ids and not context.collected_evidence:
                 missing_items.append("evidence_ids")
 
-            if missing_items:
-                logger.warning("Downgrading finding %s: Missing mandatory verification fields: %s", finding.id, missing_items)
+        positive_statuses = {
+            VerificationStatus.VERIFIED,
+            VerificationStatus.VALIDATED,
+            VerificationStatus.EXPLOITABLE,
+            VerificationStatus.HARDENING_ONLY,
+        }
+        if conclusion.status in positive_statuses:
+            unresolved_ids = [
+                evidence_id for evidence_id in conclusion.evidence_ids
+                if evidence_vault is None or evidence_vault.get_evidence(evidence_id) is None
+            ]
+            request_ids = set(conclusion.request_ids)
+            traced_requests = {
+                item.request_id for item in context.collected_evidence
+                if item.evidence_type == "verification_http_request"
+                and item.request_id
+                and not item.data.get("synthetic")
+                and isinstance(item.data.get("request"), dict)
+                and isinstance(item.data.get("response"), dict)
+            }
+            if unresolved_ids or not request_ids or not request_ids.issubset(traced_requests):
+                missing_items = ["vault-backed request/response trace"]
+                logger.warning(
+                    "Downgrading finding %s: positive verdict lacks resolvable evidence/request trace",
+                    finding.id,
+                )
                 conclusion = VerificationConclusion(
                     status=VerificationStatus.INCONCLUSIVE,
                     reason_code=VerificationReasonCode.MISSING_EVIDENCE,
-                    reason_description=f"Verification downgraded: Missing required evidence fields: {', '.join(missing_items)}.",
+                    reason_description=(
+                        "Verification downgraded: positive verdict requires resolvable vault records "
+                        "and request IDs linked to captured HTTP request/response evidence."
+                    ),
                     evidence_ids=conclusion.evidence_ids,
                     request_ids=conclusion.request_ids,
                     confidence=20,
                 )
+
+        if conclusion.status == VerificationStatus.VERIFIED and missing_items:
+            logger.warning("Downgrading finding %s: Missing mandatory verification fields: %s", finding.id, missing_items)
+            conclusion = VerificationConclusion(
+                status=VerificationStatus.INCONCLUSIVE,
+                reason_code=VerificationReasonCode.MISSING_EVIDENCE,
+                reason_description=f"Verification downgraded: Missing required evidence fields: {', '.join(missing_items)}.",
+                evidence_ids=conclusion.evidence_ids,
+                request_ids=conclusion.request_ids,
+                confidence=20,
+            )
 
         conclusion.impact_record = self._compute_impact_record(finding, conclusion)
         self._apply_conclusion_to_finding(finding, conclusion, context.collected_evidence)

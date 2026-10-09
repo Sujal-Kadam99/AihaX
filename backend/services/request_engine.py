@@ -15,6 +15,7 @@ Enforces:
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 import json
 import re
@@ -23,7 +24,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 
 from backend.core.scope_validator import (
@@ -196,6 +197,10 @@ class BaseAsyncTransport(ABC):
 class AiohttpTransport(BaseAsyncTransport):
     """Production aiohttp transport with chunked streaming for response size bounds."""
 
+    def __init__(self, ssl_context: Any = None) -> None:
+        # A caller may provide a test-specific trust store; certificate checks remain enabled.
+        self.ssl_context = ssl_context
+
     async def send(
         self,
         method: str,
@@ -214,7 +219,8 @@ class AiohttpTransport(BaseAsyncTransport):
             sock_read=timeout.read,
         )
 
-        async with aiohttp.ClientSession(timeout=client_timeout) as session:
+        connector = aiohttp.TCPConnector(ssl=self.ssl_context) if self.ssl_context else None
+        async with aiohttp.ClientSession(timeout=client_timeout, connector=connector) as session:
             async with session.request(
                 method=method,
                 url=url,
@@ -492,7 +498,18 @@ class RequestEngine:
         self.rate_limit_rps = max(1, rate_limit_rps)
         self.max_concurrency = max(1, max_concurrency)
         self._total_requests: int = 0
-
+        self._attempted_requests = 0
+        self._denied_requests = 0
+        self._redirected_requests = 0
+        self._reused_requests = 0
+        self._execution_context: contextvars.ContextVar[
+            tuple[Optional[str], Optional[str], Optional[str], Optional[str]]
+        ] = contextvars.ContextVar(
+            f"request_engine_context_{id(self)}", default=(None, None, None, None)
+        )
+        self.request_budget_reserver: Optional[
+            Callable[[str, str], Awaitable[tuple[bool, str]]]
+        ] = None
         self._rate_limiter = AsyncTokenBucket(
             rate_per_second=float(self.rate_limit_rps),
             capacity=float(self.rate_limit_rps),
@@ -502,11 +519,62 @@ class RequestEngine:
 
     @property
     def total_requests(self) -> int:
+        """Backward-compatible alias for actual transport sends."""
         return self._total_requests
+
+    @property
+    def request_counts(self) -> dict[str, int]:
+        return {
+            "attempted": self._attempted_requests,
+            "sent": self._total_requests,
+            "denied": self._denied_requests,
+            "redirected": self._redirected_requests,
+            "reused": self._reused_requests,
+        }
+
+    def record_reused(self) -> None:
+        """Record evidence served by a caller-side cache with no transport request."""
+        self._reused_requests += 1
+
+    def _set_execution_context(self, index: int, value: Optional[str]) -> None:
+        context = list(self._execution_context.get())
+        context[index] = value
+        self._execution_context.set(tuple(context))
+
+    @property
+    def current_check_id(self) -> Optional[str]:
+        return self._execution_context.get()[0]
+
+    @current_check_id.setter
+    def current_check_id(self, value: Optional[str]) -> None:
+        self._set_execution_context(0, value)
+
+    @property
+    def current_finding_id(self) -> Optional[str]:
+        return self._execution_context.get()[1]
+
+    @current_finding_id.setter
+    def current_finding_id(self, value: Optional[str]) -> None:
+        self._set_execution_context(1, value)
+
+    @property
+    def current_phase(self) -> Optional[str]:
+        return self._execution_context.get()[2]
+
+    @current_phase.setter
+    def current_phase(self, value: Optional[str]) -> None:
+        self._set_execution_context(2, value)
+
+    @property
+    def current_target_url(self) -> Optional[str]:
+        return self._execution_context.get()[3]
+
+    @current_target_url.setter
+    def current_target_url(self, value: Optional[str]) -> None:
+        self._set_execution_context(3, value)
 
     def execute_request(self, spec: RequestSpec) -> RequestEvidence:
         """Synchronous execution wrapper for tests and scripts."""
-        self._total_requests += 1
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -545,9 +613,11 @@ class RequestEngine:
         current_url = spec.url.strip()
         redirect_chain: list[str] = [current_url]
         retries_attempted = 0
+        self._attempted_requests += 1
 
         # 1. Product Safety: Authorization Confirmation Check
         if not spec.authorization_confirmed:
+            self._denied_requests += 1
             scope_decision = ScopeDecision(
                 allowed=False,
                 status=ScopeStatus.INVALID,
@@ -567,6 +637,7 @@ class RequestEngine:
         # 2. Pre-Flight Scope Validation (NO BYTES BEFORE VALIDATION)
         scope_decision = self.scope_validator.validate_request(current_url, method=method)
         if not scope_decision.allowed:
+            self._denied_requests += 1
             return self._build_blocked_evidence(
                 request_id=request_id,
                 timestamp=timestamp,
@@ -605,8 +676,10 @@ class RequestEngine:
                 break  # Successful network transmission
             except TransportError as te:
                 last_error = te
-                # Do not retry on Scope or Redirect denial
-                if te.error_type in ("SCOPE_DENIED", "REDIRECT_BLOCKED", "INVALID_URL"):
+                if te.error_type == "BUDGET_EXHAUSTED" and not te.details.get("redirect_hop", False):
+                    self._denied_requests += 1
+                # Do not retry policy denials or exhausted budget.
+                if te.error_type in ("SCOPE_DENIED", "REDIRECT_BLOCKED", "INVALID_URL", "BUDGET_EXHAUSTED"):
                     break
             except asyncio.TimeoutError:
                 last_error = TransportError(
@@ -686,6 +759,20 @@ class RequestEngine:
         redirect_count = 0
 
         while True:
+            if self.request_budget_reserver:
+                target = self.current_target_url or current_url
+                check_id = self.current_check_id or "UNATTRIBUTED"
+                allowed, reason = await self.request_budget_reserver(target, check_id)
+                if not allowed:
+                    raise TransportError(
+                        error_type="BUDGET_EXHAUSTED",
+                        message=reason,
+                        details={"redirect_hop": redirect_count > 0},
+                    )
+
+            self._total_requests += 1
+            if redirect_count > 0:
+                self._redirected_requests += 1
             resp = await self.transport.send(
                 method=current_method,
                 url=current_url,

@@ -59,7 +59,7 @@ class CheckRegistry:
         self._load_core_checks()
 
     def _load_core_checks(self):
-        """Load the foundational 77-check architecture stubs."""
+        """Load the foundational 86-check architecture stubs."""
         # SQLi Core Check
         self.register_check(
             CheckTemplate(

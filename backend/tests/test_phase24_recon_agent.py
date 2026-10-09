@@ -25,6 +25,8 @@ from backend.execution.tool_execution_boundary import (
 )
 from backend.models.database import Base, Scan
 from backend.models.migrations import run_migrations
+from backend.core.scope_validator import ScopeValidator
+from backend.services.request_engine import MockTransport, RequestEngine
 
 
 @pytest.fixture
@@ -63,6 +65,35 @@ class TestReconPreconditionGating:
         assert snapshot.status in (ReconPipelineStatus.COMPLETED.value, ReconPipelineStatus.PARTIAL_SUCCESS.value)
         assert snapshot.target == "https://app.example.com"
         assert called is True
+
+    @pytest.mark.asyncio
+    async def test_campaign_recon_http_discovery_uses_shared_request_engine(self):
+        target = "https://example.com"
+        transport = MockTransport(default_status=404, default_body="not found")
+        scope = ScopeValidator(in_scope_assets=[target])
+        request_engine = RequestEngine(scope_validator=scope, transport=transport)
+        agent = ReconAgent(request_engine=request_engine)
+        config = ReconExecutionConfig(
+            campaign_id="CAMP-RECON-SHARED-HTTP",
+            target_url=target,
+            authorization_confirmed=True,
+            in_scope_assets=[target],
+            enable_subdomain_discovery=False,
+            enable_port_scan=False,
+            enable_tech_detection=False,
+            enable_url_discovery=False,
+            enable_directory_discovery=False,
+            enable_active_crawler=False,
+            enable_dns_analysis=False,
+            enable_tls_analysis=False,
+        )
+
+        snapshot = await agent.execute_recon_pipeline(config)
+
+        assert snapshot.tool_results["aihax_http_recon"]["status"] == "COMPLETED"
+        assert request_engine.request_counts["attempted"] > 0
+        assert request_engine.request_counts["sent"] == transport.call_count
+        assert request_engine.request_counts["sent"] > 0
 
     @pytest.mark.asyncio
     async def test_wildcard_target_rejected(self):

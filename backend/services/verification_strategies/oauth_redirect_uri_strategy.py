@@ -46,6 +46,13 @@ class OAuthRedirectUriVerificationStrategy(BaseVerificationStrategy):
 
         canary_redirect = "https://aihax-oauth-canary.test/callback"
         parsed = urllib.parse.urlparse(affected_url)
+        if not any(token in parsed.path.lower() for token in ("oauth", "authorize", "/connect/")):
+            return VerificationConclusion(
+                status=VerificationStatus.INCONCLUSIVE,
+                reason_code=VerificationReasonCode.MISSING_EVIDENCE,
+                reason_description="Candidate URL is not an identifiable OAuth authorization endpoint; a generic application page cannot verify redirect URI validation.",
+                confidence=0,
+            )
         params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
         params["redirect_uri"] = [canary_redirect]
         if "client_id" not in params:
@@ -113,23 +120,23 @@ class OAuthRedirectUriVerificationStrategy(BaseVerificationStrategy):
                 confidence=100,
             )
 
-        if status == 200 and ("consent" in body.lower() or "authorize" in body.lower() or "allow" in body.lower()):
+        if status in (400, 401, 403, 404):
             return VerificationConclusion(
-                status=VerificationStatus.VERIFIED,
-                reason_code=VerificationReasonCode.PROPERTY_DEMONSTRATED,
-                reason_description="OAuth server accepted untrusted redirect_uri and proceeded to authorization prompt.",
+                status=VerificationStatus.FALSE_POSITIVE,
+                reason_code=VerificationReasonCode.CONTROL_ENFORCED,
+                reason_description=f"OAuth endpoint rejected or did not expose an authorization flow (HTTP {status}); no redirect to the canary was observed.",
                 evidence_ids=[ev_id],
                 request_ids=[resp.request_id],
-                confidence=85,
+                confidence=90,
             )
 
         return VerificationConclusion(
-            status=VerificationStatus.FALSE_POSITIVE,
-            reason_code=VerificationReasonCode.CONTRADICTORY_EVIDENCE,
-            reason_description="OAuth endpoint did not accept or redirect to the untrusted redirect_uri.",
+            status=VerificationStatus.INCONCLUSIVE,
+            reason_code=VerificationReasonCode.MISSING_EVIDENCE,
+            reason_description=f"OAuth endpoint responded with HTTP {status}, but did not redirect to the untrusted canary; acceptance was not demonstrated.",
             evidence_ids=[ev_id],
             request_ids=[resp.request_id],
-            confidence=90,
+            confidence=20,
         )
 
 
