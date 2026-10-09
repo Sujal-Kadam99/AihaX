@@ -159,6 +159,7 @@ class CampaignOperationsService:
         user_id: Optional[str] = None,
         in_scope_assets: Optional[List[str]] = None,
         selected_checks: Optional[List[str]] = None,
+        selected_recon_capabilities: Optional[List[str]] = None,
         assessment_mode: str = "CONTROLLED",
         awaiting_target: bool = False,
     ) -> Campaign:
@@ -220,6 +221,7 @@ class CampaignOperationsService:
             "scope_assets": sorted(all_targets),
             "scope_hash": scope_hash,
             "selected_checks": selected_checks or reg_meta["check_ids"],
+            "selected_recon_capabilities": sorted(set(selected_recon_capabilities or [])),
             "registry_version": reg_meta["registry_version"],
             "registry_hash": reg_meta["registry_hash"],
             "contract_hash": reg_meta["contract_hash"],
@@ -401,6 +403,7 @@ class CampaignOperationsService:
             raise ValueError("Cannot start campaign: campaign is WAITING_FOR_TARGET. Operator must supply a concrete target URL.")
 
         self._verify_authorization_or_raise(campaign)
+        authorization = self.repo.get_authorization(campaign_id)
 
         # Transition status
         updated = self.repo.update_campaign_status(
@@ -419,6 +422,20 @@ class CampaignOperationsService:
 
         # Atomically create initial task(s) if auto_dispatch=True and 0 tasks exist
         if auto_dispatch:
+            snapshot = self.repo.get_snapshot(campaign_id)
+            snapshot_data = {}
+            if snapshot and snapshot.snapshot_json:
+                try:
+                    snapshot_data = json.loads(snapshot.snapshot_json)
+                except Exception:
+                    snapshot_data = {}
+            self.repo.create_recon_run(
+                campaign=campaign,
+                authorization_id=authorization.id if authorization else None,
+                scope_hash=authorization.scope_hash if authorization else None,
+                selected_capabilities=snapshot_data.get("selected_recon_capabilities", []),
+            )
+
             existing_tasks_count = (
                 self.repo.session.query(ExecutionTask)
                 .filter(ExecutionTask.campaign_id == campaign_id)
@@ -426,22 +443,21 @@ class CampaignOperationsService:
             )
             if existing_tasks_count == 0:
                 targets = self.repo.get_targets(campaign_id)
-                snapshot = self.repo.get_snapshot(campaign_id)
+                is_recon_or_plan = str(campaign.mode or "").upper() in {"RECON_ONLY", "PLAN_ONLY"}
                 selected_checks = [
                     "C002_Missing_Security_Headers",
                     "C004_CORS_Misconfiguration",
                     "C008_Subdomain_Takeover",
                     "C037_Reflected_XSS",
                 ]
-                if snapshot and snapshot.snapshot_json:
+                if snapshot_data and not is_recon_or_plan:
                     try:
-                        snap_dict = json.loads(snapshot.snapshot_json)
-                        selected_checks = snap_dict.get("selected_checks") or selected_checks
+                        selected_checks = snapshot_data.get("selected_checks") or selected_checks
                     except Exception:
                         pass
 
                 task_specs = []
-                if targets:
+                if targets and not is_recon_or_plan:
                     for target in targets:
                         if "*" not in target.normalized_url:
                             for check_id in selected_checks:
@@ -454,7 +470,7 @@ class CampaignOperationsService:
                                     "parameters": {},
                                     "priority": 1,
                                 })
-                if not task_specs:
+                if not task_specs and not is_recon_or_plan:
                     for check_id in selected_checks:
                         task_specs.append({
                             "check_id": check_id,

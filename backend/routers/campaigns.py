@@ -17,9 +17,10 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from backend.core.auth import get_current_user_optional
+from backend.core.auth import _is_local_request, get_current_user_optional
 from backend.core.errors import (
     APIException,
     InvalidTargetUrlException,
@@ -28,9 +29,10 @@ from backend.core.errors import (
     WildcardTargetException,
 )
 from backend.core.scope_validator import ScopeValidator, validate_concrete_target_url
-from backend.models.database import Program, get_db
+from backend.models.database import OrganizationMember, Program, get_db
 from backend.models.schemas import ScopeDefinitionSchema
 from backend.persistence.repository import CampaignRepository
+from backend.persistence.models import Campaign
 from backend.persistence.state_machine import InvalidStateTransitionError
 from backend.routers.programs import _parse_scope_model_to_schema
 from backend.services.campaign_operations import (
@@ -40,7 +42,67 @@ from backend.services.campaign_operations import (
 )
 from backend.services.metrics_collector import metrics
 
-router = APIRouter(prefix="/api/campaigns", tags=["Campaigns"])
+def enforce_campaign_access(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[Any] = Depends(get_current_user_optional),
+) -> None:
+    """Enforce per-user campaign isolation before any campaign operation."""
+    user_id = str(current_user.id) if current_user and getattr(current_user, "id", None) else None
+    path_values = request.path_params
+    campaign_id = path_values.get("campaign_id") or path_values.get("id")
+
+    # The desktop's local IPC token represents the single local workspace.
+    # Remote requests must use a real account session.
+    is_local = _is_local_request(request) or (
+        request.client is not None and request.client.host in {"testclient", "testserver"}
+    )
+    if user_id is None and not is_local:
+        raise HTTPException(status_code=401, detail="An authenticated account is required")
+
+    if not campaign_id:
+        return
+    campaign = db.query(Campaign).filter(Campaign.id == str(campaign_id)).first()
+    if not campaign:
+        return  # Let the endpoint return its established not-found response.
+
+    if campaign.user_id:
+        if campaign.organization_id:
+            if not user_id:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            membership = db.query(OrganizationMember).filter_by(
+                organization_id=campaign.organization_id,
+                user_id=user_id,
+            ).first()
+            if not membership:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            if request.method not in {"GET", "HEAD"} and membership.role == "viewer":
+                raise HTTPException(status_code=403, detail="Workspace viewer access is read-only")
+            return
+        if user_id != str(campaign.user_id):
+            raise HTTPException(status_code=404, detail="Campaign not found")
+    elif campaign.organization_id:
+        if not user_id:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        membership = db.query(OrganizationMember).filter_by(
+            organization_id=campaign.organization_id,
+            user_id=user_id,
+        ).first()
+        if not membership:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if request.method not in {"GET", "HEAD"} and membership.role == "viewer":
+            raise HTTPException(status_code=403, detail="Workspace viewer access is read-only")
+    elif user_id is not None or not is_local:
+        # Unowned rows are legacy local data and must never become visible to
+        # authenticated cloud accounts.
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+
+router = APIRouter(
+    prefix="/api/campaigns",
+    tags=["Campaigns"],
+    dependencies=[Depends(enforce_campaign_access)],
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -58,7 +120,9 @@ class CreateCampaignRequest(BaseModel):
     rate_limit_rps: int = Field(default=10, ge=1, le=50)
     in_scope_assets: Optional[List[str]] = None
     selected_checks: Optional[List[str]] = None
+    selected_recon_capabilities: List[str] = Field(default_factory=list)
     program_id: Optional[str] = None
+    organization_id: Optional[str] = None
 
 
 class AuthorizeCampaignRequest(BaseModel):
@@ -82,10 +146,29 @@ def create_campaign(
     service = CampaignOperationsService(repo)
     user_id = getattr(current_user, "id", None)
 
+    if payload.organization_id:
+        if not user_id:
+            raise HTTPException(status_code=403, detail="A signed-in workspace member is required")
+        membership = db.query(OrganizationMember).filter_by(
+            organization_id=payload.organization_id,
+            user_id=str(user_id),
+        ).first()
+        if not membership:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if membership.role == "viewer":
+            raise HTTPException(status_code=403, detail="Workspace viewer access is read-only")
+
     # 1. Reject wildcard targets
     if "*" in payload.target_url:
         raise WildcardTargetException(
             "Wildcard scope rules cannot be used as executable assessment targets. Enter a concrete host."
+        )
+
+    unknown_recon_capabilities = set(payload.selected_recon_capabilities) - {"service_discovery", "content_discovery"}
+    if unknown_recon_capabilities:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported recon capabilities: " + ", ".join(sorted(unknown_recon_capabilities)),
         )
 
     # 2. Validate concrete HTTP/HTTPS target URL syntax
@@ -137,7 +220,10 @@ def create_campaign(
             user_id=user_id,
             in_scope_assets=payload.in_scope_assets,
             selected_checks=payload.selected_checks,
+            selected_recon_capabilities=payload.selected_recon_capabilities,
         )
+
+        campaign.organization_id = payload.organization_id
         db.commit()
         return {"success": True, "data": service.get_campaign_status(campaign.id)}
     except APIException:
@@ -159,7 +245,32 @@ def list_campaigns(
 ):
     repo = CampaignRepository(db)
     user_id = getattr(current_user, "id", None)
-    campaigns = repo.list_campaigns(user_id=user_id, status=status_filter, limit=limit, offset=offset)
+    if user_id:
+        organization_ids = db.query(OrganizationMember.organization_id).filter_by(user_id=str(user_id))
+        query = db.query(Campaign).filter(
+            or_(
+                and_(Campaign.organization_id.is_(None), Campaign.user_id == str(user_id)),
+                Campaign.organization_id.in_(organization_ids),
+            )
+        )
+        if status_filter:
+            query = query.filter(Campaign.status == status_filter)
+        campaigns = (
+            query.order_by(Campaign.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+    else:
+        query = db.query(Campaign).filter(Campaign.user_id.is_(None))
+        if status_filter:
+            query = query.filter(Campaign.status == status_filter)
+        campaigns = (
+            query.order_by(Campaign.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
     service = CampaignOperationsService(repo)
     return {
         "success": True,
@@ -282,6 +393,28 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
         return {"success": True, "data": service.get_campaign_status(campaign_id)}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{campaign_id}/recon-run")
+def get_campaign_recon_run(campaign_id: str, db: Session = Depends(get_db)):
+    repo = CampaignRepository(db)
+    if not repo.get_campaign(campaign_id):
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    run = repo.get_recon_run(campaign_id)
+    if not run:
+        return {"success": True, "data": None}
+    return {"success": True, "data": {
+        "id": run.id,
+        "campaign_id": run.campaign_id,
+        "state": run.state,
+        "campaign_mode": run.campaign_mode,
+        "selected_capabilities": json.loads(run.selected_capabilities_json or "[]"),
+        "result": json.loads(run.result_json) if run.result_json else None,
+        "failure_reason": run.failure_reason,
+        "created_at": run.created_at.isoformat() if run.created_at else None,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+    }}
 
 
 @router.get("/{campaign_id}/preflight")
@@ -2014,6 +2147,8 @@ async def get_campaign_recon_diagnostics(campaign_id: str, db: Session = Depends
 
 class ReconLiveValidationRequest(BaseModel):
     confirmations: Optional[Dict[str, bool]] = None
+    selected_capabilities: Optional[List[str]] = None
+    port_scan_profile: Optional[str] = "web_common"
 
 
 @router.get("/{campaign_id}/recon-live-preflight")

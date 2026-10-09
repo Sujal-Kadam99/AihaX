@@ -18,7 +18,7 @@ from backend.core.logger import setup_logger
 from backend.core.redis_client import close_redis, get_redis, subscribe_updates
 from backend.models.database import get_db, init_db
 from backend.models.schemas import HealthResponse
-from backend.routers import auth, billing, campaigns, checks, findings, programs, reports, scan, settings, watch, ws
+from backend.routers import auth, billing, campaigns, checks, findings, organizations, programs, reports, scan, settings, watch, ws
 from backend.services.campaign_worker import campaign_worker_runtime
 from backend.services.watch_scheduler import load_watch_schedules, scheduler
 
@@ -138,12 +138,18 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(findings.router)
 app.include_router(watch.router)
 app.include_router(billing.router)
+app.include_router(organizations.router)
 app.include_router(checks.router)
 app.include_router(campaigns.router)
 app.include_router(ws.router)
 
 # Direct /campaigns compatibility routes
-campaigns_compat_router = APIRouter(prefix="/campaigns", tags=["Campaigns Compatibility"], include_in_schema=False)
+campaigns_compat_router = APIRouter(
+    prefix="/campaigns",
+    tags=["Campaigns Compatibility"],
+    include_in_schema=False,
+    dependencies=[Depends(campaigns.enforce_campaign_access)],
+)
 
 @campaigns_compat_router.get("/{campaign_id}/execution-summary")
 def compat_execution_summary(campaign_id: str, db: Session = Depends(get_db)):

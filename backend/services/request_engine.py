@@ -15,6 +15,7 @@ Enforces:
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 import json
 import re
@@ -23,7 +24,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 
 from backend.core.scope_validator import (
@@ -492,7 +493,14 @@ class RequestEngine:
         self.rate_limit_rps = max(1, rate_limit_rps)
         self.max_concurrency = max(1, max_concurrency)
         self._total_requests: int = 0
-
+        self._execution_context: contextvars.ContextVar[
+            tuple[Optional[str], Optional[str], Optional[str], Optional[str]]
+        ] = contextvars.ContextVar(
+            f"request_engine_context_{id(self)}", default=(None, None, None, None)
+        )
+        self.request_budget_reserver: Optional[
+            Callable[[str, str], Awaitable[tuple[bool, str]]]
+        ] = None
         self._rate_limiter = AsyncTokenBucket(
             rate_per_second=float(self.rate_limit_rps),
             capacity=float(self.rate_limit_rps),
@@ -503,6 +511,43 @@ class RequestEngine:
     @property
     def total_requests(self) -> int:
         return self._total_requests
+
+    def _set_execution_context(self, index: int, value: Optional[str]) -> None:
+        context = list(self._execution_context.get())
+        context[index] = value
+        self._execution_context.set(tuple(context))
+
+    @property
+    def current_check_id(self) -> Optional[str]:
+        return self._execution_context.get()[0]
+
+    @current_check_id.setter
+    def current_check_id(self, value: Optional[str]) -> None:
+        self._set_execution_context(0, value)
+
+    @property
+    def current_finding_id(self) -> Optional[str]:
+        return self._execution_context.get()[1]
+
+    @current_finding_id.setter
+    def current_finding_id(self, value: Optional[str]) -> None:
+        self._set_execution_context(1, value)
+
+    @property
+    def current_phase(self) -> Optional[str]:
+        return self._execution_context.get()[2]
+
+    @current_phase.setter
+    def current_phase(self, value: Optional[str]) -> None:
+        self._set_execution_context(2, value)
+
+    @property
+    def current_target_url(self) -> Optional[str]:
+        return self._execution_context.get()[3]
+
+    @current_target_url.setter
+    def current_target_url(self, value: Optional[str]) -> None:
+        self._set_execution_context(3, value)
 
     def execute_request(self, spec: RequestSpec) -> RequestEvidence:
         """Synchronous execution wrapper for tests and scripts."""
@@ -605,8 +650,8 @@ class RequestEngine:
                 break  # Successful network transmission
             except TransportError as te:
                 last_error = te
-                # Do not retry on Scope or Redirect denial
-                if te.error_type in ("SCOPE_DENIED", "REDIRECT_BLOCKED", "INVALID_URL"):
+                # Do not retry policy denials or exhausted budget.
+                if te.error_type in ("SCOPE_DENIED", "REDIRECT_BLOCKED", "INVALID_URL", "BUDGET_EXHAUSTED"):
                     break
             except asyncio.TimeoutError:
                 last_error = TransportError(
@@ -686,6 +731,16 @@ class RequestEngine:
         redirect_count = 0
 
         while True:
+            if self.request_budget_reserver:
+                target = self.current_target_url or current_url
+                check_id = self.current_check_id or "UNATTRIBUTED"
+                allowed, reason = await self.request_budget_reserver(target, check_id)
+                if not allowed:
+                    raise TransportError(
+                        error_type="BUDGET_EXHAUSTED",
+                        message=reason,
+                    )
+
             resp = await self.transport.send(
                 method=current_method,
                 url=current_url,

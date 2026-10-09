@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Card from './ui/Card';
 import Badge from './ui/Badge';
+import { formatPortScope } from '../lib/portScope';
 
 export default function LiveReconPreflightModal({
   isOpen,
@@ -31,6 +32,8 @@ export default function LiveReconPreflightModal({
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [selectedCapabilities, setSelectedCapabilities] = useState([]);
+  const [portScanProfile, setPortScanProfile] = useState('web_common');
 
   useEffect(() => {
     // Reset state when modal opens
@@ -41,6 +44,8 @@ export default function LiveReconPreflightModal({
         capabilitiesReviewed: false,
         liveTrafficAcknowledged: false,
       });
+      setSelectedCapabilities([]);
+      setPortScanProfile('web_common');
     }
   }, [isOpen]);
 
@@ -68,7 +73,7 @@ export default function LiveReconPreflightModal({
     if (!canLaunch) return;
     setSubmitting(true);
     try {
-      await onConfirmLaunch(confirmations);
+      await onConfirmLaunch(confirmations, selectedCapabilities, portScanProfile);
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +123,7 @@ export default function LiveReconPreflightModal({
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs text-rose-400 font-semibold bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                    <XCircle className="w-3.5 h-3.5" /> MISSING / EXPIRED
+                    <XCircle className="w-3.5 h-3.5" /> {auth.status || 'MISSING / EXPIRED'}
                   </span>
                 )}
               </div>
@@ -126,6 +131,7 @@ export default function LiveReconPreflightModal({
                 <div>ID: <span className="text-indigo-400">{auth.authorization_id || 'N/A'}</span></div>
                 <div>Operator: <span className="text-zinc-200">{auth.authorized_by || 'N/A'}</span></div>
                 <div>Expires: <span className="text-zinc-400">{auth.expires_at ? auth.expires_at.slice(0, 19) : 'N/A'}</span></div>
+                <div>Written scope reference: <span className={auth.reference_present ? 'text-emerald-400' : 'text-rose-400'}>{auth.reference_present ? 'RECORDED' : 'REQUIRED'}</span></div>
               </div>
             </div>
 
@@ -167,8 +173,50 @@ export default function LiveReconPreflightModal({
               <span>Active Testing & Service Discovery Warning</span>
             </div>
             <p className="text-amber-300/90 leading-relaxed">
-              <strong>Nmap</strong> (Service Discovery), <strong>Gobuster</strong> (Content Discovery), <strong>Nuclei</strong> (Vulnerability Detection), and <strong>Dalfox</strong> (Specialized Active Testing) require explicit policy opt-in flags and authorized scope consent. Un-authorized execution attempts are strictly blocked.
+              <strong>Nmap</strong> scans only the selected ports that remain authorized after exclusions. <strong>Gobuster</strong> uses AihaX’s small bundled wordlist with two workers. Select either active recon capability below only when it is included in the client authorization. Nuclei and Dalfox vulnerability probes remain outside this recon run.
             </p>
+          </div>
+
+          <div className="p-4 bg-zinc-950 rounded-lg border border-zinc-800 space-y-3">
+            <h3 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Optional Active Recon</h3>
+            <p className="text-xs text-zinc-400">Passive OSINT and low-impact HTTP discovery run under the campaign authorization. These active profiles stay off unless selected for this run.</p>
+            {[
+              ['service_discovery', 'Bounded service discovery (authorized TCP ports)'],
+              ['content_discovery', 'Bounded path discovery (small wordlist, two workers)'],
+            ].map(([capability, label]) => (
+              <label key={capability} className="flex items-start gap-3 cursor-pointer text-xs text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={selectedCapabilities.includes(capability)}
+                  onChange={() => setSelectedCapabilities((prev) => prev.includes(capability)
+                    ? prev.filter((item) => item !== capability)
+                    : [...prev, capability])}
+                  className="mt-0.5 rounded border-zinc-700 bg-zinc-900 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+            <div className="text-xs text-zinc-400 font-mono" data-testid="port-scope-summary">
+              Allowed: {formatPortScope(scope.allowed_ports)} · Excluded: {formatPortScope(scope.excluded_ports)}
+            </div>
+            {selectedCapabilities.includes('service_discovery') && (
+              <div className="space-y-2 border-t border-zinc-800 pt-3">
+                <label htmlFor="port-scan-profile" className="block text-xs text-zinc-300">Service scan port coverage</label>
+                <select
+                  id="port-scan-profile"
+                  aria-label="Service scan port coverage"
+                  value={portScanProfile}
+                  onChange={(event) => setPortScanProfile(event.target.value)}
+                  className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-200"
+                >
+                  <option value="web_common">Common web ports within scope (80, 443, 8080, 8443)</option>
+                  <option value="all_authorized">All authorized TCP ports in scope</option>
+                </select>
+                <p className="text-[11px] text-amber-300/90">
+                  The selected profile is intersected with Allowed Ports and then Excluded Ports are removed. All authorized ports can generate more probes; select it only when the client policy explicitly permits that coverage.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Tool Matrix Preflight Table */}

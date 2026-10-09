@@ -2,6 +2,7 @@
 
 import hashlib
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -99,6 +100,67 @@ def test_verify_google_id_token_empty_fails():
     with pytest.raises(HTTPException) as exc:
         verify_google_id_token("")
     assert exc.value.status_code == 400
+
+
+@pytest.mark.parametrize(
+    ("audience", "email_verified", "expected_detail"),
+    [
+        ("other-client.apps.googleusercontent.com", True, "Invalid token audience"),
+        ("aihax-client.apps.googleusercontent.com", False, "email is not verified"),
+    ],
+)
+def test_google_login_rejects_wrong_audience_and_unverified_email(
+    monkeypatch, audience, email_verified, expected_detail
+):
+    import backend.core.auth as auth_module
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "dev_mock_auth", False)
+    monkeypatch.setattr(settings, "google_client_id", "aihax-client.apps.googleusercontent.com")
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "iss": "https://accounts.google.com",
+                "aud": audience,
+                "exp": int(datetime.now(timezone.utc).timestamp()) + 300,
+                "sub": "google-subject",
+                "email": "person@example.com",
+                "email_verified": email_verified,
+            }
+
+    monkeypatch.setattr(auth_module.requests, "get", lambda *args, **kwargs: FakeResponse())
+    with pytest.raises(HTTPException) as exc:
+        verify_google_id_token("signed-google-token")
+    assert exc.value.status_code == 401
+    assert expected_detail in exc.value.detail
+
+
+def test_google_tokeninfo_accepts_verified_email_boolean_string(monkeypatch):
+    import backend.core.auth as auth_module
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "dev_mock_auth", False)
+    monkeypatch.setattr(settings, "google_client_id", "aihax-client.apps.googleusercontent.com")
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "iss": "https://accounts.google.com",
+                "aud": "aihax-client.apps.googleusercontent.com",
+                "exp": int(datetime.now(timezone.utc).timestamp()) + 300,
+                "sub": "google-subject",
+                "email": "person@example.com",
+                "email_verified": "true",
+            }
+
+    monkeypatch.setattr(auth_module.requests, "get", lambda *args, **kwargs: FakeResponse())
+    claims = verify_google_id_token("signed-google-token")
+    assert claims["email_verified"] is True
 
 
 # -----------------------------------------------------------------------------

@@ -20,7 +20,40 @@ def test_config_missing_cloud_secrets():
     # In cloud environment, if stripe_secret_key is missing,
     # it should raise ValidationError via model_post_init
     with pytest.raises(ValueError, match="is required in cloud environment"):
-        Settings(environment="cloud", stripe_secret_key="")
+        Settings(environment="cloud", dev_mock_auth=False, stripe_secret_key="")
+
+
+def test_cloud_requires_google_oauth_client_id():
+    with pytest.raises(ValueError, match="google_client_id is required in cloud environment"):
+        Settings(environment="cloud", dev_mock_auth=False, google_client_id="")
+
+
+def test_cloud_environment_validation_is_case_insensitive():
+    with pytest.raises(ValueError, match="google_client_id is required in cloud environment"):
+        Settings(environment="CLOUD", dev_mock_auth=False, google_client_id="")
+
+
+def test_cloud_requires_separate_entitlement_signing_keys():
+    shared_cloud_settings = {
+        "environment": "cloud",
+        "dev_mock_auth": False,
+        "google_client_id": "aihax-test-client-id.apps.googleusercontent.com",
+        "stripe_secret_key": "stripe-test-value",
+        "aihax_master_key": "master-test-value",
+    }
+    with pytest.raises(ValueError, match="entitlement_signing_private_key is required"):
+        Settings(
+            **shared_cloud_settings,
+            entitlement_signing_private_key=None,
+            entitlement_verification_public_key=None,
+        )
+
+    with pytest.raises(ValueError, match="entitlement_verification_public_key is required"):
+        Settings(
+            **shared_cloud_settings,
+            entitlement_signing_private_key="configured-private-key",
+            entitlement_verification_public_key=None,
+        )
 
 def test_logger_secret_redaction():
     filter_instance = SensitiveDataFilter()

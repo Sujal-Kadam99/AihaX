@@ -49,6 +49,8 @@ from backend.recon.live_recon_validator import (
     ReconLifecycleEvent,
     ToolExecutionRecord,
     ToolValidationStatus,
+    select_service_scan_ports,
+    compress_nmap_port_list,
 )
 from backend.recon.recon_modes import ReconAssetStatus, ReconExecutionMode
 from backend.recon.snapshot import CanonicalReconSnapshot
@@ -82,6 +84,73 @@ class TestPhase25UnitGates:
         }
         actual_statuses = {s.value for s in ToolValidationStatus}
         assert expected_statuses.issubset(actual_statuses)
+
+    def test_service_scan_ports_follow_authorized_scope_and_exclusions(self):
+        assert select_service_scan_ports(
+            allowed_ports=[80, 443, 8443, 9443],
+            excluded_ports=[443],
+            profile="web_common",
+        ) == [80, 8443]
+        assert select_service_scan_ports(
+            allowed_ports=[80, 443, 8443, 9443],
+            excluded_ports=[443],
+            profile="all_authorized",
+        ) == [80, 8443, 9443]
+
+    def test_service_scan_requires_an_explicit_authorized_port_list(self):
+        assert select_service_scan_ports([], [], profile="all_authorized") == []
+
+    def test_nmap_port_spec_compresses_ranges_without_changing_coverage(self):
+        assert compress_nmap_port_list([1, 2, 3, 80, 443, 444, 445]) == "1-3,80,443-445"
+
+    @pytest.mark.asyncio
+    async def test_nmap_request_uses_only_authorized_non_excluded_ports_and_scope_rules(self):
+        from types import SimpleNamespace
+
+        captured = {}
+
+        class CapturingBoundary:
+            async def execute(self, request):
+                captured["request"] = request
+                return SimpleNamespace(
+                    execution_status=ToolExecutionStatus.SUCCESS.value,
+                    duration_ms=1,
+                    exit_code=0,
+                    stdout="8443/tcp open https-alt",
+                    stdout_hash="stdout-hash",
+                    stderr_hash="stderr-hash",
+                    output_hash="evidence-hash",
+                    error_category=None,
+                    stderr="",
+                )
+
+        engine = LiveReconValidationEngine(tool_boundary=CapturingBoundary())
+        engine.tool_availability.resolve_binary_path = lambda _tool: "nmap.exe"
+        scope_validator = ScopeValidator(
+            in_scope_assets=["example.test", "*.example.test"],
+            out_of_scope_assets=["private.example.test"],
+        )
+
+        record = await engine._validate_nmap(
+            base_domain="app.example.test",
+            target="https://app.example.test",
+            campaign_id="campaign",
+            auth_id="authorization",
+            allow_port_scan=True,
+            scope_validator=scope_validator,
+            scope_hash="scope-hash",
+            allowed_ports=[80, 443, 8443, 9443],
+            excluded_ports=[443, 9443],
+            service_scan_profile="all_authorized",
+        )
+
+        request = captured["request"]
+        assert record.status == ToolValidationStatus.EXECUTED_RESULTS_NORMALIZED
+        assert request.args == ["-sT", "-T2", "-p", "80,8443", "--open", "app.example.test"]
+        assert request.allowed_ports == [80, 8443]
+        assert request.excluded_ports == [443, 9443]
+        assert request.in_scope_assets == ["example.test", "*.example.test"]
+        assert request.out_of_scope_assets == ["private.example.test"]
 
     def test_sublist3r_formally_not_implemented(self):
         """Sublist3r must be explicitly marked NOT_IMPLEMENTED with documented rationale."""

@@ -17,6 +17,7 @@ import ScanHistory from './pages/ScanHistory';
 import WatchMode from './pages/WatchMode';
 import Billing from './pages/Billing';
 import Onboarding from './pages/Onboarding';
+import Workspaces from './pages/Workspaces';
 
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
@@ -45,6 +46,7 @@ export default function App() {
                 <Route path="/evidence" element={<Evidence />} />
                 <Route path="/audit" element={<Audit />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/workspaces" element={<Workspaces />} />
 
                 {/* Backward-Compatible & Support Routes */}
                 <Route path="/new-scan" element={<Navigate to="/new-assessment" replace />} />

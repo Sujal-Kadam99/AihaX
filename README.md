@@ -1,111 +1,60 @@
 # AihaX
 
-AI-powered application security testing and verification platform for web apps, APIs, and exposed attack surfaces.
+AihaX is a desktop-first application security assessment platform for authorized testing of web applications. It combines a React interface, Electron shell, and FastAPI service for managing scope, assessment campaigns, findings, evidence, and reports.
 
-AihaX combines reconnaissance, deterministic vulnerability checks, verification strategies, and reporting into a single security workflow designed for real-world testing with strong guardrails and false-positive controls.
+> Run assessments only against systems you own or are explicitly authorized to test. Live reconnaissance requires explicit operator confirmation, a concrete in-scope target, recorded authorization, and server-side safety checks.
 
 ## Latest updates
 
-The project has recently expanded from a basic prototype into a production-style security engine with:
+- Vulnerability check catalog spans C001–C086, with the canonical registry currently covering C001–C077 and additional checks available in the wider check modules.
+- Expanded verification strategies, evidence capture, and false-positive controls.
+- Reconnaissance pipeline improvements for discovery, parameter handling, and bounded live execution.
+- Campaign persistence and lifecycle handling, signed billing entitlements, and shared team workspaces.
+- Windows Electron update workflow gated on signed release artifacts and a configured HTTPS feed.
 
-- 77 deterministic vulnerability checks across 7 OWASP-aligned categories
-- batch verification coverage for C/D class checks, including C078-C086 and expanded hypothesis logic
-- 30 verification strategies for reducing false positives and validating real exploitation paths
-- stronger recon capabilities with app/API wordlists, Katana crawling support, and live recon mode
-- hardened execution pipeline with safer tool resolution, allow_loopback handling, and report fallbacks
-- repository cleanup to remove large binaries and reduce noisy artifacts
-
-## Core capabilities
-
-### Deterministic security checks
-AihaX includes a full catalog of production checks covering:
-
-- recon and asset exposure
-- authentication and session weaknesses
-- injection and parser issues
-- XSS and client-side abuse
-- configuration and hardening gaps
-- data exposure and sensitive file leakage
-- business logic and access-control flaws
-
-The implementation is documented in `docs/checks/README.md` and the check catalog under `docs/checks/`.
-
-### Verification engine
-Each candidate issue is passed through a multi-layer verification pipeline designed to reject generic HTTP errors and weak signals. This includes:
-
-- deterministic exploit and validation probes
-- differential analysis against expected safe behavior
-- evidence capture for verified findings
-- false-positive controls based on status codes, headers, and response signatures
-
-### Recon and live testing
-Recent updates include:
-
-- app/API wordlist expansion for broader discovery
-- Katana crawler integration for deeper surface mapping
-- project-local tool resolution for internal binaries and support utilities
-- live recon mode and safer pass-through execution
+Capabilities and maturity vary by check and deployment configuration. See [the check catalog](docs/checks/README.md) and [verification model](docs/finding_verification_model.md).
 
 ## Architecture
 
 ```text
-Target / Asset
-  -> Scope validation and request budget controls
-  -> Request engine / transport layer
-  -> Recon and discovery agents
-  -> Deterministic vulnerability checks
-  -> Verification and differential validation
-  -> Evidence capture and report generation
+Electron desktop shell (optional)
+└── React + Vite interface (localhost:3000)
+    └── FastAPI backend (localhost:8000)
+        ├── SQLite persistence and reports
+        ├── Redis worker and event support
+        ├── Reconnaissance and verification services
+        └── Optional security tools and external integrations
 ```
 
-## Repository structure
+The development Docker Compose stack runs the backend, Redis, and frontend. SQLite, reports, and configuration are mounted from host directories. ChromaDB is an optional backend capability, not a required service in the Compose stack.
 
-```text
-AihaX/
-├── backend/              # API and scanning orchestration
-├── docker/                # container setup and runtime config
-├── docs/                  # security check catalog and implementation docs
-├── electron/              # desktop shell (if present in your checkout)
-├── frontend/              # UI and dashboard
-├── bin/                   # bundled tool dependencies and helper binaries
-├── templates/             # report templates
-├── wordlists/             # target discovery and recon wordlists
-├── README.md              # project overview
-├── .gitignore             # local/runtime exclusions
-├── requirements*.txt      # Python dependencies
-├── package*.json          # frontend/electron dependencies
-└── ...
-```
+## Requirements
+
+- Windows 10/11 and Docker Desktop for the documented desktop/container workflow.
+- Python 3.11+ for running the backend directly.
+- Node.js and npm for the frontend and Electron development.
+- Git and OpenSSL for release and entitlement-key workflows, when needed.
 
 ## Quick start
 
-### Docker backend
+1. Copy `.env.example` to `.env` and set unique local values for `JWT_SECRET_KEY`, `AIHAX_MASTER_KEY`, and `AIHAX_REDIS_PASSWORD`. Do not commit `.env` or production secrets.
+2. Start the backend services from the repository root:
 
-```powershell
-cd docker
-$env:AIHAX_REPORTS = "$env:USERPROFILE\AihaX\Reports"
-$env:AIHAX_DB = "$env:USERPROFILE\AihaX\db"
-$env:AIHAX_CONFIG = "$env:USERPROFILE\AihaX\config"
-docker-compose up -d --build
-```
+   ```powershell
+   docker compose -f docker/docker-compose.yml up --build
+   ```
 
-Verify health:
+3. In another terminal, install and run the web interface:
 
-```bash
-curl http://localhost:8000/api/health
-```
+   ```powershell
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-### Frontend
+4. Open <http://localhost:3000>. The API health endpoint is <http://127.0.0.1:8000/api/health>.
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open the app at http://localhost:3000
-
-### Optional desktop app
+For the desktop shell, install its dependencies and start Electron:
 
 ```powershell
 cd electron
@@ -113,22 +62,47 @@ npm install
 npm run dev
 ```
 
-## Security and governance
+Use the assessment UI to select an authorized program, enter a concrete target, validate scope, record authorization, and choose the assessment mode. Live reconnaissance has a separate confirmation and preflight workflow; read [its operator requirements](docs/recon_live_execution.md) before enabling it.
 
-AihaX is designed for authorized security testing only. Every scan should be scoped to assets you own or explicitly have permission to assess.
+## Development
 
-## Recent feature highlights
+Backend dependencies are listed in `backend/requirements.txt`; frontend and Electron scripts are in their respective `package.json` files.
 
-- Batch C/D checks and broader coverage for exploit verification
-- real-target validation and safeguard logic for high-risk checks
-- recon pipeline hardening and safer tool execution
-- removal of large tracked binaries to keep the repository lighter and cleaner
-- improved detection coverage for default credentials, directory listings, verbose errors, and transport issues
+```powershell
+# Backend tests
+python -m pytest backend/tests
 
-## Notes
+# Frontend tests and production build
+cd frontend
+npm test
+npm run build
 
-The repository has been actively evolving with a strong emphasis on deterministic verification and reducing false positives in real-world web and API assessments.
+# Electron updater-policy tests
+cd ../electron
+npm run test:update
+```
+
+The repository also includes Ruff configuration in `pyproject.toml`. Some integration and live-target tests may require local services, tools, or explicitly authorized test targets; inspect test names and fixtures before running them.
+
+## Configuration and deployment notes
+
+- `.env.example` documents local and cloud settings. Use fresh secrets in each environment.
+- Billing integrations require Stripe credentials and configured price IDs. Local configuration alone does not provide a hosted subscription issuer.
+- Signed tier entitlements use Ed25519 keys. Keep the private signing key in the trusted issuer; desktop installations should receive only the verification key. See [signed entitlements](docs/operations/signed-entitlements.md).
+- Team workspaces and role behavior are described in [team workspaces](docs/operations/team-workspaces.md).
+- Windows release builds require a signing certificate, HTTPS update feed, and expected publisher configuration. See [secure updates](docs/operations/secure-updates.md).
+- The Compose backend is bound to loopback. Review authentication, CORS, trusted-host, secret, persistence, and network settings before deploying beyond local development.
+
+## Documentation
+
+- [Live reconnaissance execution and preflight](docs/recon_live_execution.md)
+- [Reconnaissance architecture and scope safety](docs/recon_architecture.md), [scope safety](docs/recon_scope_safety.md)
+- [Campaign lifecycle and persistence](docs/operations/campaign-lifecycle.md), [task recovery](docs/operations/task-recovery.md)
+- [Signed entitlements](docs/operations/signed-entitlements.md)
+- [Team workspaces](docs/operations/team-workspaces.md)
+- [Secure Windows updates](docs/operations/secure-updates.md)
+- [Verification model](docs/finding_verification_model.md)
 
 ## License
 
-Proprietary project license (see repository policy and any included licensing files for details).
+No license file is currently included. All rights are reserved unless the repository owner adds a license granting other rights.

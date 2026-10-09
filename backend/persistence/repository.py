@@ -25,6 +25,7 @@ from backend.persistence.models import (
     AuditTrailEvent,
     AuthorizationRecord,
     Campaign,
+    CampaignReconRun,
     CampaignSnapshot,
     CampaignTarget,
     EvidenceRecord,
@@ -115,6 +116,156 @@ class CampaignRepository:
 
     def get_campaign(self, campaign_id: str) -> Optional[Campaign]:
         return self.session.query(Campaign).filter(Campaign.id == campaign_id).first()
+
+    def get_recon_run(self, campaign_id: str) -> Optional[CampaignReconRun]:
+        return self.session.query(CampaignReconRun).filter_by(campaign_id=campaign_id).first()
+
+    def create_recon_run(
+        self,
+        campaign: Campaign,
+        authorization_id: Optional[str],
+        scope_hash: Optional[str],
+        selected_capabilities: Optional[List[str]] = None,
+    ) -> CampaignReconRun:
+        existing = self.get_recon_run(campaign.id)
+        if existing:
+            return existing
+        run = CampaignReconRun(
+            id=str(uuid.uuid4()),
+            campaign_id=campaign.id,
+            campaign_mode=campaign.mode,
+            assessment_mode=getattr(campaign, "assessment_mode", "CONTROLLED") or "CONTROLLED",
+            state="PENDING",
+            authorization_id=authorization_id,
+            scope_hash=scope_hash,
+            selected_capabilities_json=json.dumps(sorted(set(selected_capabilities or []))),
+            created_at=_utc_now(),
+        )
+        self.session.add(run)
+        self.session.flush()
+        self.append_audit_event(
+            campaign_id=campaign.id,
+            event_type="CAMPAIGN_RECON_QUEUED",
+            actor="system",
+            object_id=run.id,
+            metadata={"mode": run.campaign_mode, "assessment_mode": run.assessment_mode},
+        )
+        return run
+
+    def recover_stale_recon_runs(self) -> List[CampaignReconRun]:
+        now = _utc_now()
+        stale = (
+            self.session.query(CampaignReconRun)
+            .join(Campaign, CampaignReconRun.campaign_id == Campaign.id)
+            .filter(
+                CampaignReconRun.state == "RUNNING",
+                CampaignReconRun.lease_expires_at < now,
+                Campaign.status == CampaignLifecycleState.RUNNING.value,
+            )
+            .all()
+        )
+        for run in stale:
+            run.state = "PENDING"
+            run.worker_id = None
+            run.lease_expires_at = None
+            run.failure_reason = "Previous worker lease expired; recon run queued for recovery."
+            self.append_audit_event(
+                campaign_id=run.campaign_id,
+                event_type="CAMPAIGN_RECON_RECOVERED",
+                actor="system_recovery",
+                object_id=run.id,
+                metadata={"state": "PENDING"},
+            )
+        self.session.flush()
+        return stale
+
+    def claim_next_recon_run(self, worker_id: str, lease_seconds: int = 600, campaign_id: Optional[str] = None) -> Optional[CampaignReconRun]:
+        now = _utc_now()
+        query = (
+            self.session.query(CampaignReconRun)
+            .join(Campaign, CampaignReconRun.campaign_id == Campaign.id)
+            .filter(
+                CampaignReconRun.state == "PENDING",
+                Campaign.status == CampaignLifecycleState.RUNNING.value,
+            )
+        )
+        if campaign_id:
+            query = query.filter(CampaignReconRun.campaign_id == campaign_id)
+        run = query.order_by(CampaignReconRun.created_at.asc()).first()
+        if not run:
+            return None
+        claimed = (
+            self.session.query(CampaignReconRun)
+            .filter(CampaignReconRun.id == run.id, CampaignReconRun.state == "PENDING")
+            .update(
+                {
+                    CampaignReconRun.state: "RUNNING",
+                    CampaignReconRun.worker_id: worker_id,
+                    CampaignReconRun.lease_expires_at: now + timedelta(seconds=lease_seconds),
+                    CampaignReconRun.started_at: CampaignReconRun.started_at if run.started_at else now,
+                    CampaignReconRun.failure_reason: None,
+                },
+                synchronize_session=False,
+            )
+        )
+        if not claimed:
+            self.session.expire_all()
+            return None
+        self.session.flush()
+        self.append_audit_event(
+            campaign_id=run.campaign_id,
+            event_type="CAMPAIGN_RECON_STARTED",
+            actor=worker_id,
+            object_id=run.id,
+            metadata={"mode": run.campaign_mode},
+        )
+        self.session.refresh(run)
+        return run
+
+    def complete_recon_run(self, run_id: str, result_json: str, worker_id: Optional[str] = None) -> CampaignReconRun:
+        run = self.session.query(CampaignReconRun).filter_by(id=run_id).first()
+        if not run:
+            raise ValueError(f"Campaign recon run '{run_id}' not found.")
+        if run.state == "COMPLETED":
+            return run
+        if worker_id and run.worker_id and run.worker_id != worker_id:
+            raise ValueError(f"Worker '{worker_id}' does not own recon run '{run_id}'.")
+        run.state = "COMPLETED"
+        run.result_json = result_json
+        run.failure_reason = None
+        run.worker_id = None
+        run.lease_expires_at = None
+        run.completed_at = _utc_now()
+        self.session.flush()
+        self.append_audit_event(
+            campaign_id=run.campaign_id,
+            event_type="CAMPAIGN_RECON_COMPLETED",
+            actor=worker_id or "system",
+            object_id=run.id,
+            metadata={"result_hash": hashlib.sha256(result_json.encode("utf-8")).hexdigest()},
+        )
+        return run
+
+    def fail_recon_run(self, run_id: str, reason: str, blocked: bool = False, worker_id: Optional[str] = None) -> CampaignReconRun:
+        run = self.session.query(CampaignReconRun).filter_by(id=run_id).first()
+        if not run:
+            raise ValueError(f"Campaign recon run '{run_id}' not found.")
+        if worker_id and run.worker_id and run.worker_id != worker_id:
+            raise ValueError(f"Worker '{worker_id}' does not own recon run '{run_id}'.")
+        run.state = "BLOCKED" if blocked else "FAILED"
+        run.failure_reason = reason
+        run.worker_id = None
+        run.lease_expires_at = None
+        run.completed_at = _utc_now()
+        self.session.flush()
+        self.append_audit_event(
+            campaign_id=run.campaign_id,
+            event_type="CAMPAIGN_RECON_BLOCKED" if blocked else "CAMPAIGN_RECON_FAILED",
+            actor=worker_id or "system",
+            object_id=run.id,
+            metadata={"reason": reason},
+        )
+        return run
 
     def list_campaigns(
         self,

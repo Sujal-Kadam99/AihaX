@@ -12,6 +12,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { useToast } from '../hooks/useToast';
+import { parsePortScope } from '../lib/portScope';
 
 export default function Targets() {
   const { addToast } = useToast();
@@ -30,8 +31,8 @@ export default function Targets() {
   const [newProgram, setNewProgram] = useState({
     name: '',
     description: '',
-    in_scope_assets: 'https://example.com/*',
-    out_of_scope_assets: 'https://example.com/internal/*',
+    in_scope_assets: '',
+    out_of_scope_assets: '',
     allowed_ports: '80, 443',
     excluded_ports: '22, 3389, 25',
     allowed_schemes: 'http, https',
@@ -88,8 +89,8 @@ export default function Targets() {
         scope: {
           in_scope_assets: newProgram.in_scope_assets.split(',').map((s) => s.trim()).filter(Boolean),
           out_of_scope_assets: newProgram.out_of_scope_assets.split(',').map((s) => s.trim()).filter(Boolean),
-          allowed_ports: newProgram.allowed_ports.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n)),
-          excluded_ports: newProgram.excluded_ports.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n)),
+          allowed_ports: parsePortScope(newProgram.allowed_ports),
+          excluded_ports: parsePortScope(newProgram.excluded_ports),
           allowed_schemes: newProgram.allowed_schemes.split(',').map((s) => s.trim()).filter(Boolean),
           excluded_paths: newProgram.excluded_paths.split(',').map((s) => s.trim()).filter(Boolean),
         },
@@ -446,12 +447,12 @@ export default function Targets() {
 
           <Input
             label="In-Scope Assets (comma separated)"
-            placeholder="https://example.com/*, *.example.com"
+            placeholder="example.com, *.example.com"
             value={newProgram.in_scope_assets}
             onChange={(e) => setNewProgram({ ...newProgram, in_scope_assets: e.target.value })}
             required
           />
-
+          <p className="-mt-3 text-[11px] text-text-muted">Scope rules define authorization. Add a wildcard only when the client policy explicitly includes subdomains; AihaX discovers hosts separately, then checks each host against these rules before follow-up recon. Out-of-scope rules take precedence.</p>
           <Input
             label="Explicit Out-of-Scope Assets"
             placeholder="https://example.com/internal/*, admin.example.com"
@@ -462,7 +463,7 @@ export default function Targets() {
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Allowed Ports"
-              placeholder="80, 443"
+              placeholder="80, 443, 8000-8100"
               value={newProgram.allowed_ports}
               onChange={(e) => setNewProgram({ ...newProgram, allowed_ports: e.target.value })}
             />
@@ -473,6 +474,7 @@ export default function Targets() {
               onChange={(e) => setNewProgram({ ...newProgram, excluded_ports: e.target.value })}
             />
           </div>
+          <p className="-mt-3 text-[11px] text-text-muted">Enter ports or ranges (for example, 80, 443, 8000-8100). Service discovery scans only these authorized ports; excluded ports are always removed.</p>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-border">
             <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>

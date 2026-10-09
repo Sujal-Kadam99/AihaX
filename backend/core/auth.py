@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import jwt
+import requests
 from fastapi import Depends, HTTPException, Request, WebSocket
 from sqlalchemy.orm import Session
 
@@ -15,7 +16,12 @@ from backend.core.config import get_settings
 from backend.models.database import RefreshToken, User, get_db
 
 TOKEN_FILENAME = ".api_token"
-PUBLIC_PATHS = {"/api/health", "/api/auth/google/login", "/api/auth/refresh"}
+PUBLIC_PATHS = {
+    "/api/health",
+    "/api/auth/google/login",
+    "/api/auth/refresh",
+    "/api/billing/webhook",  # Stripe authenticates this route with its signature header.
+}
 PUBLIC_PREFIXES: set[str] = set()
 TOKEN_PATH = "/api/auth/token"
 LOCAL_ONLY_PATHS = {"/api/auth/token", "/api/auth/admin", "/api/auth/admin/verify", "/openapi.json"}
@@ -226,6 +232,10 @@ def verify_google_id_token(id_token_str: str) -> dict[str, Any]:
         if settings.google_client_id and data.get("aud") != settings.google_client_id:
             raise HTTPException(status_code=401, detail="Invalid token audience")
 
+        verified_email = data.get("email_verified", data.get("verified_email"))
+        if verified_email is not True and str(verified_email).casefold() != "true":
+            raise HTTPException(status_code=401, detail="Google account email is not verified")
+
         exp = int(data.get("exp", 0))
         now_ts = int(datetime.now(timezone.utc).timestamp())
         if exp < now_ts:
@@ -239,7 +249,7 @@ def verify_google_id_token(id_token_str: str) -> dict[str, Any]:
         return {
             "sub": str(google_sub),
             "email": str(email),
-            "email_verified": bool(data.get("email_verified", True)),
+            "email_verified": True,
             "name": data.get("name", email.split("@")[0]),
             "picture": data.get("picture"),
         }

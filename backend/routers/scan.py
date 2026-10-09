@@ -13,7 +13,7 @@ from backend.core.config import get_settings
 from backend.core.rate_limit import check_scan_rate_limit
 from backend.core.redis_client import get_agent_state, get_scan_status, set_scan_status
 from backend.core.entitlements import get_user_tier
-from backend.models.database import Finding, Scan, get_db, Subscription
+from backend.models.database import Finding, Scan, get_db
 from backend.models.schemas import (
     AgentStatus,
     FindingsCount,
@@ -36,29 +36,21 @@ async def start_scan(
 ):
     settings = get_settings()
 
-    # --- Identity & owner bypass ---
-    from backend.core.auth import _is_local_request, get_user_context
+    # The scan profile and quota exemptions are granted only by a verified,
+    # signed entitlement. A localhost request or client-supplied admin_mode
+    # flag is not proof of an owner or paid account.
+    from backend.core.auth import get_user_context
 
-    is_local = _is_local_request(request)
     user_ctx = get_user_context(request)
     user_email = user_ctx.get("email")
     user_id = user_ctx.get("user_id")
 
-    is_owner = False
-    if is_local and not user_email:
-        # Local desktop app on localhost = owner
-        is_owner = True
-    elif user_email and settings.owner_email and user_email == settings.owner_email:
-        is_owner = True
-
-    if is_owner or config.admin_mode:
+    if tier == "founder":
         # Force best results, bypass all limits
         config.scan_depth = "deep"
         config.threads = 20
         config.waf_bypass = True
         config.stealth_mode = False
-        if not config.admin_mode:
-            config.admin_mode = True
     else:
         # Prevent free users from using advanced features
         if tier == "free":
@@ -66,16 +58,7 @@ async def start_scan(
                 raise HTTPException(status_code=403, detail="Advanced features like admin_mode, deep scan, and waf_bypass require a Pro subscription.")
         
         # --- Freemium: limit free users to 3 scans per month ---
-        active_sub = None
-        if user_email:
-            active_sub = (
-                db.query(Subscription)
-                .filter_by(email=user_email, status="active")
-                .filter(Subscription.end_date > datetime.now(timezone.utc))
-                .first()
-            )
-
-        if not active_sub:
+        if tier == "free":
             now = datetime.now(timezone.utc)
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 

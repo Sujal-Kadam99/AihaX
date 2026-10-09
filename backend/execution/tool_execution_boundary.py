@@ -156,7 +156,7 @@ ALLOWED_TOOLS: Dict[str, ToolDefinition] = {
         requires_authorization=True,
         default_timeout=60,
         max_timeout=120,
-        allowed_flags={"-sV", "-sT", "-p", "-T4", "-Pn", "--open", "-oX", "-oN"},
+        allowed_flags={"-sV", "-sT", "-p", "-T2", "-T4", "-Pn", "--open", "-oX", "-oN"},
     ),
     "whatweb": ToolDefinition(
         name="whatweb",

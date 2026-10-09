@@ -202,10 +202,12 @@ class CampaignRequestBudget:
         campaign_budget: int = 500,
         target_budget: int = 100,
         check_budget: int = 20,
+        recon_budget: int = 100,
     ):
         self.campaign_budget = max(1, campaign_budget)
         self.target_budget = max(1, target_budget)
         self.check_budget = max(1, check_budget)
+        self.recon_budget = max(1, recon_budget)
 
         self._campaign_requests = 0
         self._target_requests: dict[str, int] = {}
@@ -228,11 +230,39 @@ class CampaignRequestBudget:
 
             check_key = f"{target_url}|{check_id}"
             check_used = self._check_requests.get(check_key, 0)
-            if check_used >= self.check_budget:
-                reason = f"Check budget exhausted ({check_used}/{self.check_budget}) for {check_id}"
+            check_limit = self.recon_budget if check_id == "RECON_DISCOVERY" else self.check_budget
+            if check_used >= check_limit:
+                reason = f"Check budget exhausted ({check_used}/{check_limit}) for {check_id}"
                 self._record_budget_event("check_exhausted", target_url, check_id, reason)
                 return False, reason
 
+            return True, "OK"
+
+    async def reserve_request(self, target_url: str, check_id: str) -> tuple[bool, str]:
+        """Atomically reserve one actual outbound HTTP exchange."""
+        async with self._lock:
+            if self._campaign_requests >= self.campaign_budget:
+                reason = f"Campaign budget exhausted ({self._campaign_requests}/{self.campaign_budget})"
+                self._record_budget_event("campaign_exhausted", target_url, check_id, reason)
+                return False, reason
+
+            target_used = self._target_requests.get(target_url, 0)
+            if target_used >= self.target_budget:
+                reason = f"Target budget exhausted ({target_used}/{self.target_budget}) for {target_url}"
+                self._record_budget_event("target_exhausted", target_url, check_id, reason)
+                return False, reason
+
+            check_key = f"{target_url}|{check_id}"
+            check_used = self._check_requests.get(check_key, 0)
+            check_limit = self.recon_budget if check_id == "RECON_DISCOVERY" else self.check_budget
+            if check_used >= check_limit:
+                reason = f"Check budget exhausted ({check_used}/{check_limit}) for {check_id}"
+                self._record_budget_event("check_exhausted", target_url, check_id, reason)
+                return False, reason
+
+            self._campaign_requests += 1
+            self._target_requests[target_url] = target_used + 1
+            self._check_requests[check_key] = check_used + 1
             return True, "OK"
 
     def is_exhausted(self, target_url: str, check_id: str) -> bool:
@@ -241,16 +271,15 @@ class CampaignRequestBudget:
             return True
         if self._target_requests.get(target_url, 0) >= self.target_budget:
             return True
-        if self._check_requests.get(f"{target_url}|{check_id}", 0) >= self.check_budget:
+        check_limit = self.recon_budget if check_id == "RECON_DISCOVERY" else self.check_budget
+        if self._check_requests.get(f"{target_url}|{check_id}", 0) >= check_limit:
             return True
         return False
 
     async def record_request(self, target_url: str, check_id: str) -> None:
-        async with self._lock:
-            self._campaign_requests += 1
-            self._target_requests[target_url] = self._target_requests.get(target_url, 0) + 1
-            check_key = f"{target_url}|{check_id}"
-            self._check_requests[check_key] = self._check_requests.get(check_key, 0) + 1
+        allowed, reason = await self.reserve_request(target_url, check_id)
+        if not allowed:
+            raise BudgetExhaustedException(reason)
 
     def _record_budget_event(self, event_type: str, target: str, check_id: str, reason: str) -> None:
         self.budget_events.append({
@@ -477,6 +506,7 @@ class CampaignExecutor:
         campaign_budget: int = 500,
         target_budget: int = 100,
         check_budget: int = 20,
+        recon_budget: int = 100,
     ):
         self.scope_validator = scope_validator
         self.transport = transport
@@ -487,6 +517,7 @@ class CampaignExecutor:
             campaign_budget=campaign_budget,
             target_budget=target_budget,
             check_budget=check_budget,
+            recon_budget=recon_budget,
         )
 
         # Core Engines
@@ -498,6 +529,7 @@ class CampaignExecutor:
         )
         self.verification_engine = VerificationEngine()
         self.report_generator = BugBountyReportGenerator()
+        self.request_engine.request_budget_reserver = self.budget.reserve_request
 
         # Audit & Safety state
         self.audit_trail: list[dict[str, Any]] = []
@@ -680,6 +712,39 @@ class CampaignExecutor:
             )
 
         # 2. Asset Normalization & Deduplication
+        recon_res = None
+        if enable_recon:
+            from backend.recon.orchestrator import ReconOrchestrator
+
+            # Attribute discovery requests to their own budget bucket and
+            # phase so they are visible in request evidence and cannot bypass
+            # the campaign-level reservation callback.
+            self.request_engine.current_check_id = "RECON_DISCOVERY"
+            self.request_engine.current_finding_id = None
+            self.request_engine.current_phase = "recon"
+            self.request_engine.current_target_url = target_url
+            try:
+                recon_orch = ReconOrchestrator(
+                    request_engine=self.request_engine,
+                    scope_validator=self.scope_validator,
+                )
+                recon_res = await recon_orch.execute_reconnaissance(
+                    campaign_id=campaign_id,
+                    target_domain=target_url,
+                    seed_assets=list(discovered_assets or []),
+                    auth_contexts=auth_contexts,
+                    # Keep the initial campaign host-bounded. Additional
+                    # hosts require explicit asset inputs and scope approval.
+                    enable_subdomain_discovery=False,
+                )
+                self.safety_events.extend(recon_res.safety_events)
+                self.log_audit("recon_completed", recon_res.to_summary_dict())
+            finally:
+                self.request_engine.current_check_id = None
+                self.request_engine.current_finding_id = None
+                self.request_engine.current_phase = None
+                self.request_engine.current_target_url = None
+
         raw_assets = [target_url] + list(discovered_assets or [])
         canonical_assets = AssetNormalizer.deduplicate_assets(raw_assets)
         self.log_audit("assets_normalized", {
@@ -750,9 +815,12 @@ class CampaignExecutor:
 
                 async with sem:
                     executed_checks_count += 1
-                    await self.budget.record_request(plan.target.canonical_url, check_id)
                     self.log_audit("check_started", {"check_id": check_id, "target": plan.target.canonical_url})
 
+                    self.request_engine.current_check_id = check_id
+                    self.request_engine.current_finding_id = None
+                    self.request_engine.current_phase = "check"
+                    self.request_engine.current_target_url = plan.target.canonical_url
                     try:
                         # Pass request_engine to check
                         sig = inspect.signature(check_instance.execute)
@@ -760,6 +828,10 @@ class CampaignExecutor:
                             "campaign_id": campaign_id,
                             "safe_mode": self.safe_mode,
                             "auth_contexts": auth_contexts or {},
+                            "discovered_endpoints": [
+                                endpoint.to_dict() for endpoint in (recon_res.endpoints if recon_res else [])
+                            ],
+                            "discovery_provenance": "live_scope_gated_recon" if recon_res else None,
                         }
                         if len(sig.parameters) >= 3:
                             result = await check_instance.execute(self.request_engine, plan.target.canonical_url, config)
@@ -782,6 +854,8 @@ class CampaignExecutor:
                             })
 
                             # 6. Deterministic Verification via VerificationEngine
+                            self.request_engine.current_finding_id = candidate.id
+                            self.request_engine.current_phase = "verification"
                             conclusion = await self.verification_engine.verify_finding(
                                 finding=candidate,
                                 request_engine=self.request_engine,
@@ -808,6 +882,11 @@ class CampaignExecutor:
                     except Exception as e:
                         logger.exception(f"Error executing check {check_id} against {plan.target.canonical_url}: {e}")
                         self.log_audit("check_error", {"check_id": check_id, "error": str(e)})
+                    finally:
+                        self.request_engine.current_check_id = None
+                        self.request_engine.current_finding_id = None
+                        self.request_engine.current_phase = None
+                        self.request_engine.current_target_url = None
 
         # 7. Deduplicate Verified Findings & Compute Cryptographic Evidence Hashes
         dedup_groups = FindingDeduplicator.deduplicate_findings(verified_findings)
@@ -865,6 +944,10 @@ class CampaignExecutor:
             findings=candidates,
             deduplicated_groups=dedup_groups,
             reports=report_dtos,
+            technologies=[technology.to_dict() for technology in recon_res.technologies] if recon_res else [],
+            endpoints=[endpoint.to_dict() for endpoint in recon_res.endpoints] if recon_res else [],
+            recon_result=recon_res.to_summary_dict() if recon_res else None,
+            parameters_discovered=sum(len(endpoint.parameters) for endpoint in recon_res.endpoints) if recon_res else 0,
         )
 
     def _create_candidate_finding(

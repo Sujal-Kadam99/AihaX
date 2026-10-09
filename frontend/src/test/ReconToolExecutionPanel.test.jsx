@@ -154,4 +154,59 @@ describe('ReconToolExecutionPanel UI Component', () => {
     expect(screen.getByText('subfinder')).toBeDefined();
     expect(screen.queryByText('crtsh')).toBeNull();
   });
+
+  it('shows the hostname on per-host follow-up recon records', () => {
+    const result = {
+      ...mockValidationResult,
+      tool_records: {
+        'http_probe:app.example.com': {
+          tool_name: 'http_probe',
+          target: 'https://app.example.com',
+          status: 'LIVE_VALIDATED',
+          exit_code: 0,
+          parsed_result_count: 1,
+        },
+      },
+    };
+
+    render(<ReconToolExecutionPanel validationResult={result} />);
+
+    expect(screen.getByText(/http_probe.*app\.example\.com/)).toBeDefined();
+  });
+});
+
+
+it('shows discovered, followed-up, and deferred host coverage', () => {
+  render(<ReconToolExecutionPanel validationResult={{
+    target: 'https://example.test',
+    tool_records: {},
+    host_followup_summary: {
+      in_scope_hosts_discovered: 12,
+      hosts_followed_up: 10,
+      hosts_deferred_by_budget: 2,
+      followup_host_limit: 10,
+    },
+  }} />);
+
+  expect(screen.getByText(/12 in-scope hosts discovered/)).toBeDefined();
+  expect(screen.getByText(/10 followed up/)).toBeDefined();
+  expect(screen.getByText(/2 deferred by the host budget/)).toBeDefined();
+});
+
+
+it('shows the authorized Nmap port selection in run results', () => {
+  render(<ReconToolExecutionPanel validationResult={{
+    target: 'https://example.test',
+    tool_records: {},
+    port_scan_coverage: {
+      profile: 'all_authorized',
+      allowed_ports: '80,8000-8100',
+      excluded_ports: '443',
+      selected_ports: '80,8000-8100',
+      selected_port_count: 102,
+    },
+  }} />);
+
+  expect(screen.getByText(/Nmap port plan: all authorized TCP ports/)).toBeDefined();
+  expect(screen.getByText(/Selected ports: 80,8000-8100 \(102\)/)).toBeDefined();
 });

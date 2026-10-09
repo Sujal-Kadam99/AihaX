@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import urlparse
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
@@ -66,8 +67,29 @@ class C019PasswordPolicyWeakness(BaseCheck):
             if not resp.success:
                 continue
 
-            # If the server accepts the registration with 200/201 without rejecting password length
-            if resp.response_status in (200, 201) and "password" not in (resp.response_body or "").lower():
+            content_type = next(
+                (value for key, value in resp.response_headers.items() if key.lower() == "content-type"),
+                "",
+            ).lower()
+            # A single-page-app fallback commonly returns 200 HTML for arbitrary POST
+            # paths. That is not evidence that a registration endpoint accepted a password.
+            if resp.response_status in (200, 201) and "application/json" in content_type:
+                try:
+                    response_data = json.loads(resp.response_body or "")
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                accepted_account = (
+                    isinstance(response_data, dict)
+                    and (
+                        response_data.get("user")
+                        or response_data.get("userId")
+                        or response_data.get("id")
+                        or response_data.get("token")
+                        or response_data.get("authentication")
+                    )
+                )
+                if not accepted_account:
+                    continue
                 return CheckResult(
                     check_id=self.contract.id,
                     title=self.contract.name,
@@ -75,7 +97,7 @@ class C019PasswordPolicyWeakness(BaseCheck):
                     affected_url=reg_url,
                     vulnerability_type=self.contract.vulnerability_type,
                     severity=Severity.LOW,
-                    candidate_reason=f"Registration endpoint '{reg_url}' accepted trivial single-character password ('1') with HTTP {resp.response_status}.",
+                    candidate_reason=f"JSON registration endpoint '{reg_url}' returned account-creation data after a weak-password submission (HTTP {resp.response_status}); confirm account identity and cleanup policy before treating this as verified.",
                     request_ids=[resp.request_id],
                     evidence_ids=[resp.evidence_id],
                     observed_data={"endpoint": reg_url, "status": resp.response_status},

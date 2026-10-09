@@ -18,14 +18,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import update
 
 from backend.core.errors import NotFoundException
 from backend.core.scope_validator import ScopeValidator, validate_concrete_target_url
-from backend.persistence.models import AuthorizationRecord, AuditTrailEvent
+from backend.persistence.models import AuthorizationRecord, AuditTrailEvent, Campaign
 from backend.persistence.repository import CampaignRepository
 from backend.recon.recon_modes import ReconContext, ReconExecutionMode
 from backend.recon.recon_preflight import ReconPreflightGate, PreflightStatus
 from backend.recon.recon_tool_availability import ReconToolAvailability
+from backend.services.request_engine import RequestEngine
 
 
 TOOL_CAPABILITY_MAP: Dict[str, Dict[str, Any]] = {
@@ -101,6 +103,8 @@ TOOL_CAPABILITY_MAP: Dict[str, Dict[str, Any]] = {
     },
 }
 
+LIVE_RECON_ACTIVE_CAPABILITIES = {"service_discovery", "content_discovery"}
+
 
 class OperatorLiveReconService:
     """Service providing preflight validation and controlled mock runs for operator-initiated live recon UI."""
@@ -130,22 +134,41 @@ class OperatorLiveReconService:
         auth_expiry_iso = None
         authorized_by = None
         scope_hash = None
+        authorization_reference = None
 
         if auth_record:
             expires_at = auth_record.expires_at
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if expires_at > now_utc:
+            authorization_reference = auth_record.authorization_reference
+            if expires_at > now_utc and authorization_reference:
                 auth_active = True
                 auth_id = auth_record.id
                 auth_expiry_iso = expires_at.isoformat()
                 authorized_by = auth_record.authorized_by
                 scope_hash = auth_record.scope_hash
 
-        # 2. Evaluate target & scope
+        # 2. Resolve the complete program scope. The campaign root is a seed,
+        # not the authorization boundary: wildcard rules and explicit sibling
+        # hosts must survive into discovery so every result can be classified.
         target_url = campaign.target_url
-        in_scope = getattr(campaign, "in_scope_assets", None) or ([target_url] if target_url else [])
-        out_of_scope = getattr(campaign, "out_of_scope_assets", None) or []
+        in_scope = []
+        out_of_scope = []
+        allowed_ports = []
+        excluded_ports = []
+        if campaign.program_id:
+            try:
+                from backend.models.database import ProgramScope
+                scope_record = db.query(ProgramScope).filter_by(program_id=campaign.program_id).first()
+                if scope_record:
+                    in_scope = json.loads(scope_record.in_scope_assets or "[]")
+                    out_of_scope = json.loads(scope_record.out_of_scope_assets or "[]")
+                    allowed_ports = json.loads(scope_record.allowed_ports or "[]")
+                    excluded_ports = json.loads(scope_record.excluded_ports or "[]")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                in_scope, out_of_scope = [], []
+        if not in_scope:
+            in_scope = [target_url] if target_url else []
         scope_validator = ScopeValidator(
             in_scope_assets=in_scope,
             out_of_scope_assets=out_of_scope,
@@ -212,11 +235,18 @@ class OperatorLiveReconService:
                 "authorization_id": auth_id,
                 "authorized_by": authorized_by or "operator",
                 "expires_at": auth_expiry_iso,
-                "status": "ACTIVE" if auth_active else "MISSING_OR_EXPIRED",
+                "reference_present": bool(authorization_reference),
+                "status": "ACTIVE" if auth_active else (
+                    "MISSING_OR_EXPIRED" if not auth_record or expires_at <= now_utc else "AUTHORIZATION_REFERENCE_REQUIRED"
+                ),
             },
             "scope": {
                 "scope_hash": scope_hash or "NOT_COMPUTED",
                 "status": "VALID" if preflight_decision.allowed else "INVALID",
+                "in_scope_rules": in_scope,
+                "out_of_scope_rules": out_of_scope,
+                "allowed_ports": allowed_ports,
+                "excluded_ports": excluded_ports,
             },
             "permitted_capabilities": {
                 "passive_recon": auth_active,
@@ -229,6 +259,7 @@ class OperatorLiveReconService:
             "safety_budget": {
                 "max_concurrency": 1,
                 "rate_limit_rps": 2,
+                "max_discovered_hosts": 100,
                 "read_only_http": True,
                 "disabled_actions": [
                     "Destructive Operations",
@@ -263,6 +294,29 @@ class OperatorLiveReconService:
         if mode not in ("mock", "test", "live"):
             raise ValueError("Only 'mode=mock', 'mode=test', or 'mode=live' is supported.")
 
+        confirmations = payload.get("confirmations") or {}
+        selected_capabilities = set(payload.get("selected_capabilities") or [])
+        port_scan_profile = payload.get("port_scan_profile", "web_common")
+        if port_scan_profile not in {"web_common", "all_authorized"}:
+            raise ValueError("Unsupported service discovery port profile.")
+        unknown_capabilities = selected_capabilities - LIVE_RECON_ACTIVE_CAPABILITIES
+        if unknown_capabilities:
+            raise ValueError(
+                "Unsupported live recon capabilities: " + ", ".join(sorted(unknown_capabilities))
+            )
+        if mode == "live":
+            required_confirmations = (
+                "authActive",
+                "targetCorrect",
+                "capabilitiesReviewed",
+                "liveTrafficAcknowledged",
+            )
+            missing = [key for key in required_confirmations if confirmations.get(key) is not True]
+            if missing:
+                raise ValueError(
+                    "Live recon requires explicit operator confirmations: " + ", ".join(missing)
+                )
+
         # 2. Preflight re-validation
         preflight = await cls.get_preflight(campaign_id, db)
         if not preflight["can_launch"]:
@@ -275,14 +329,20 @@ class OperatorLiveReconService:
             campaign_id=campaign_id,
             timestamp=datetime.now(timezone.utc),
             actor=operator_id,
-            event_type="OPERATOR_LIVE_RECON_VALIDATION_MOCK_LAUNCHED",
+            event_type=(
+                "OPERATOR_LIVE_RECON_LAUNCHED"
+                if mode == "live"
+                else "OPERATOR_LIVE_RECON_VALIDATION_MOCK_LAUNCHED"
+            ),
             object_id=campaign_id,
             metadata_json=json.dumps({
                 "mode": mode,
                 "target": preflight["target"],
                 "authorization_id": preflight["authorization"]["authorization_id"],
                 "scope_hash": preflight["scope"]["scope_hash"],
-                "confirmations": payload.get("confirmations", {}),
+                "confirmations": confirmations,
+                "selected_capabilities": sorted(selected_capabilities),
+                "port_scan_profile": port_scan_profile,
             }),
             previous_event_hash="0" * 64,
             event_hash=str(uuid.uuid4()).replace("-", ""),
@@ -292,7 +352,28 @@ class OperatorLiveReconService:
 
         if mode == "live":
             from backend.recon.live_recon_validator import LiveReconValidationEngine, ExecutionOrigin
-            engine = LiveReconValidationEngine()
+            authorized_scope = ScopeValidator(
+                in_scope_assets=preflight["scope"]["in_scope_rules"],
+                out_of_scope_assets=preflight["scope"]["out_of_scope_rules"],
+            )
+            request_engine = RequestEngine(scope_validator=authorized_scope, rate_limit_rps=2, max_concurrency=1)
+
+            async def reserve_campaign_request(_target: str, _check_id: str):
+                changed = db.query(Campaign).filter(
+                    Campaign.id == campaign_id,
+                    Campaign.requests_used < Campaign.campaign_budget,
+                ).update(
+                    {Campaign.requests_used: Campaign.requests_used + 1},
+                    synchronize_session=False,
+                )
+                db.commit()
+                if changed:
+                    return True, "Campaign request budget reserved."
+                current = db.query(Campaign).filter_by(id=campaign_id).first()
+                return False, f"Campaign request budget exhausted ({current.requests_used if current else 0}/{current.campaign_budget if current else 0})."
+
+            request_engine.request_budget_reserver = reserve_campaign_request
+            engine = LiveReconValidationEngine(request_engine=request_engine)
             
             # Use real execution
             result = await engine.execute_validation_suite(
@@ -300,11 +381,20 @@ class OperatorLiveReconService:
                 campaign_id=campaign_id,
                 authorization_record_id=preflight["authorization"]["authorization_id"],
                 operator_confirmed=True,
-                scope_assets=[preflight["target"]],
+                # Preserve the selected program's wildcard/explicit rules so
+                # discovered hosts are judged by policy instead of root-only scope.
+                scope_assets=preflight["scope"]["in_scope_rules"],
+                out_of_scope_assets=preflight["scope"]["out_of_scope_rules"],
                 db_session=db,
                 scope_snapshot_hash=preflight["scope"]["scope_hash"],
-                allow_port_scan=preflight["permitted_capabilities"].get("service_discovery", False),
-                allow_dir_scan=preflight["permitted_capabilities"].get("content_discovery", False),
+                # These active profiles are disabled by default and can only be
+                # enabled for this run by explicit operator selection above.
+                allow_port_scan="service_discovery" in selected_capabilities,
+                allow_dir_scan="content_discovery" in selected_capabilities,
+                max_host_targets=min(max(int(preflight.get("safety_budget", {}).get("max_discovered_hosts", 100)), 0), 100),
+                allowed_ports=preflight["scope"].get("allowed_ports", []),
+                excluded_ports=preflight["scope"].get("excluded_ports", []),
+                service_scan_profile=port_scan_profile,
                 execution_origin=ExecutionOrigin.PHASE27_CONTROLLED_PIPELINE,
                 pipeline_run_id=f"run-live-{uuid.uuid4().hex[:8]}",
             )
@@ -318,6 +408,9 @@ class OperatorLiveReconService:
                 "audit_event_id": event_id,
                 "target": preflight["target"],
                 "tool_records": {k: v.to_dict() for k, v in result.tool_records.items()},
+                "host_followup_summary": getattr(result, "host_followup_summary", {}),
+                "port_scan_coverage": getattr(result, "port_scan_coverage", {}),
+                "endpoint_discovery": getattr(result, "endpoint_discovery", {}),
                 "executed_at": datetime.now(timezone.utc).isoformat(),
             }
 

@@ -10,6 +10,7 @@ from typing import Callable, Optional, Generator, Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -360,6 +361,19 @@ class Subscription(Base):
     end_date = Column(UTCDateTime, nullable=False)
     last_notified = Column(UTCDateTime, nullable=True)
     created_at = Column(UTCDateTime, default=get_utc_now, nullable=False)
+    stripe_subscription_id = Column(String, nullable=True)
+    stripe_customer_id = Column(String, nullable=True)
+    stripe_checkout_session_id = Column(String, nullable=True)
+
+
+class StripeWebhookEvent(Base):
+    """Processed Stripe event IDs provide webhook retry idempotency."""
+
+    __tablename__ = "stripe_webhook_events"
+
+    event_id = Column(String, primary_key=True)
+    event_type = Column(String, nullable=False)
+    received_at = Column(UTCDateTime, default=get_utc_now, nullable=False)
 
 
 class User(Base):
@@ -377,6 +391,48 @@ class User(Base):
 
     # ORM Relationships
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    organization_memberships = relationship(
+        "OrganizationMember",
+        back_populates="user",
+        foreign_keys="OrganizationMember.user_id",
+        cascade="all, delete-orphan",
+    )
+
+
+class Organization(Base):
+    """A paid workspace that owns shared campaign access and membership."""
+
+    __tablename__ = "organizations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(120), nullable=False)
+    created_by_user_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    created_at = Column(UTCDateTime, default=get_utc_now, nullable=False)
+
+    creator = relationship("User", foreign_keys=[created_by_user_id])
+    members = relationship("OrganizationMember", back_populates="organization", cascade="all, delete-orphan")
+    campaigns = relationship("Campaign", back_populates="organization")
+
+
+class OrganizationMember(Base):
+    """An active user and role assignment inside an organization."""
+
+    __tablename__ = "organization_members"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "user_id", name="uq_organization_member_user"),
+        CheckConstraint("role IN ('owner', 'admin', 'member', 'viewer')", name="ck_organization_member_role"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(16), nullable=False, default="member")
+    invited_by_user_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(UTCDateTime, default=get_utc_now, nullable=False)
+
+    organization = relationship("Organization", back_populates="members")
+    user = relationship("User", foreign_keys=[user_id], back_populates="organization_memberships")
+    invited_by = relationship("User", foreign_keys=[invited_by_user_id])
 
 
 class RefreshToken(Base):

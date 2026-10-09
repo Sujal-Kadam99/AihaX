@@ -61,7 +61,7 @@ class ReconOrchestrator:
     ) -> ReconResult:
         """Run full reconnaissance pipeline and produce deterministic check execution plan."""
         start_time = time.perf_counter()
-        initial_calls = len(getattr(self.request_engine.transport, "calls", []))
+        initial_calls = self.request_engine.total_requests
 
         result = ReconResult(campaign_id=campaign_id, target_domain=target_domain)
 
@@ -124,7 +124,7 @@ class ReconOrchestrator:
         result.planned_checks = self.plan_checks_from_capabilities(capabilities_map)
 
         result.recon_duration = time.perf_counter() - start_time
-        final_calls = len(getattr(self.request_engine.transport, "calls", []))
+        final_calls = self.request_engine.total_requests
         result.recon_requests_used = max(0, final_calls - initial_calls)
 
         return result

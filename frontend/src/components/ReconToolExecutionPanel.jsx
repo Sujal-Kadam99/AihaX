@@ -48,26 +48,17 @@ export const TOOL_STATUS_MAP = {
 export default function ReconToolExecutionPanel({ validationResult, title = "Reconnaissance Tool Execution & Validation Gate" }) {
   const [expandedTool, setExpandedTool] = useState(null);
   const [filter, setFilter] = useState('ALL');
+  const [liveResult, setLiveResult] = useState(null);
+  const displayResult = liveResult || validationResult;
+  const campaignId = displayResult?.campaign_id;
 
-  const defaultTools = [
-    { tool_name: 'subfinder', status: 'BINARY_UNAVAILABLE', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Executable subfinder not found on system PATH.' },
-    { tool_name: 'sublist3r', status: 'STUB_ONLY', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'STUB_ONLY / PRODUCTION_CAPABILITY_NOT_IMPLEMENTED' },
-    { tool_name: 'amass', status: 'BINARY_UNAVAILABLE', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Executable amass not found on system PATH.' },
-    { tool_name: 'crtsh', status: 'LIVE_VALIDATED', executed: true, parsed_result_count: 14, snapshot_contribution_count: 12, evidence_id: 'sha256-crt-ev', failure_reason: null },
-    { tool_name: 'wayback', status: 'LIVE_VALIDATED', executed: true, parsed_result_count: 38, snapshot_contribution_count: 24, evidence_id: 'sha256-wb-ev', failure_reason: null },
-    { tool_name: 'gau', status: 'BINARY_UNAVAILABLE', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Executable gau not found on system PATH.' },
-    { tool_name: 'dns_recon', status: 'LIVE_VALIDATED', executed: true, parsed_result_count: 5, snapshot_contribution_count: 5, evidence_id: 'sha256-dns-ev', failure_reason: null },
-    { tool_name: 'http_probe', status: 'LIVE_VALIDATED', executed: true, parsed_result_count: 1, snapshot_contribution_count: 1, evidence_id: 'sha256-http-ev', failure_reason: null },
-    { tool_name: 'whatweb', status: 'BINARY_UNAVAILABLE', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Executable whatweb not found on system PATH.' },
-    { tool_name: 'nmap', status: 'BLOCKED_POLICY', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Port scanning is not explicitly authorized under program policy.' },
-    { tool_name: 'gobuster', status: 'BLOCKED_POLICY', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Directory brute force is not explicitly authorized under program policy.' },
-    { tool_name: 'nuclei', status: 'NOT_SELECTED_RECON_ONLY', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Vulnerability scanner; excluded from recon-only validation.' },
-    { tool_name: 'dalfox', status: 'NOT_SELECTED_RECON_ONLY', executed: false, parsed_result_count: 0, snapshot_contribution_count: 0, evidence_id: null, failure_reason: 'Active XSS scanner/fuzzer; excluded from recon-only validation.' },
-  ];
-
-  const toolRecords = validationResult?.tool_records
-    ? Object.values(validationResult.tool_records)
-    : defaultTools;
+  const toolRecords = displayResult?.tool_records
+    ? Object.entries(displayResult.tool_records).map(([recordKey, record]) => ({
+        ...record,
+        record_key: recordKey,
+        display_name: recordKey.includes(':') ? `${record.tool_name}: ${recordKey.slice(recordKey.indexOf(':') + 1)}` : record.tool_name,
+      }))
+    : [];
 
   const filteredTools = toolRecords.filter((t) => {
     if (filter === 'ALL') return true;
@@ -86,10 +77,10 @@ export default function ReconToolExecutionPanel({ validationResult, title = "Rec
   const [loadingPreflight, setLoadingPreflight] = useState(false);
 
   const handleOpenPreflight = async () => {
+    if (!campaignId) return;
     setIsPreflightOpen(true);
     setLoadingPreflight(true);
     try {
-      const campaignId = validationResult?.campaign_id || 'demo-campaign';
       const res = await getCampaignReconLivePreflight(campaignId);
       if (res && res.data) {
         setPreflightData(res.data.data || res.data);
@@ -101,11 +92,17 @@ export default function ReconToolExecutionPanel({ validationResult, title = "Rec
     }
   };
 
-  const handleConfirmLaunch = async (confirmations) => {
+  const handleConfirmLaunch = async (confirmations, selectedCapabilities = [], portScanProfile = 'web_common') => {
     try {
-      const campaignId = validationResult?.campaign_id || 'demo-campaign';
-      const res = await postCampaignReconLiveValidation(campaignId, 'live', { confirmations });
+      if (!campaignId) return;
+      const res = await postCampaignReconLiveValidation(campaignId, 'live', {
+        confirmations,
+        selected_capabilities: selectedCapabilities,
+        port_scan_profile: portScanProfile,
+      });
       if (res && res.data) {
+        const resultData = res.data.data || res.data;
+        setLiveResult(resultData);
         setIsPreflightOpen(false);
       }
     } catch (e) {
@@ -122,17 +119,32 @@ export default function ReconToolExecutionPanel({ validationResult, title = "Rec
             <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
           </div>
           <p className="text-xs text-zinc-400 mt-1">
-            Target: <span className="font-mono text-zinc-300">{validationResult?.target || 'https://www.mitacsc.ac.in'}</span> | Scope Invariant: Discovered assets marked <code className="text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded text-[11px]">DISCOVERED_NOT_AUTHORIZED</code>
+            Target: <span className="font-mono text-zinc-300">{displayResult?.target || 'Not selected'}</span> | Discovered hosts are checked against program scope before per-host follow-up recon.
           </p>
+          {displayResult?.port_scan_coverage && (
+            <p className="text-xs text-zinc-400 mt-2" data-testid="port-scan-coverage">
+              Nmap port plan: {displayResult.port_scan_coverage.profile === 'all_authorized' ? 'all authorized TCP ports' : 'common web ports within scope'} ·{' '}
+              Selected ports: {displayResult.port_scan_coverage.selected_ports || 'none'} ({displayResult.port_scan_coverage.selected_port_count ?? 0}) ·{' '}
+              Excluded: {displayResult.port_scan_coverage.excluded_ports || 'none'}
+            </p>
+          )}
+          {displayResult?.host_followup_summary && (
+            <p className="text-xs text-zinc-400 mt-2" data-testid="host-followup-summary">
+              {displayResult.host_followup_summary.in_scope_hosts_discovered ?? 0} in-scope hosts discovered ·{' '}
+              {displayResult.host_followup_summary.hosts_followed_up ?? 0} followed up ·{' '}
+              {displayResult.host_followup_summary.hosts_deferred_by_budget ?? 0} deferred by the host budget
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={handleOpenPreflight}
-            className="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-sm shadow-indigo-600/20"
+            disabled={!campaignId}
+            className="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-sm shadow-indigo-600/20"
           >
             <Shield className="w-3.5 h-3.5" />
-            Run Live Recon Validation
+            {campaignId ? 'Run Live Recon Validation' : 'Campaign Required'}
           </button>
 
           <div className="flex items-center gap-1">
@@ -156,7 +168,7 @@ export default function ReconToolExecutionPanel({ validationResult, title = "Rec
       <LiveReconPreflightModal
         isOpen={isPreflightOpen}
         onClose={() => setIsPreflightOpen(false)}
-        campaignId={validationResult?.campaign_id || 'demo-campaign'}
+        campaignId={campaignId || ''}
         preflightData={preflightData}
         onConfirmLaunch={handleConfirmLaunch}
         loading={loadingPreflight}
@@ -176,6 +188,13 @@ export default function ReconToolExecutionPanel({ validationResult, title = "Rec
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/60 font-mono">
+            {filteredTools.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-8 px-3 text-center text-zinc-500">
+                  No recon execution evidence is loaded. Run recon from an authorized campaign to populate this view.
+                </td>
+              </tr>
+            )}
             {filteredTools.map((tool) => {
               const statusMeta = TOOL_STATUS_MAP[tool.status] || {
                 label: tool.status,
@@ -184,12 +203,12 @@ export default function ReconToolExecutionPanel({ validationResult, title = "Rec
               };
               const isExecuted = tool.exit_code !== null || tool.status === 'LIVE_VALIDATED';
               const hasEvidence = Boolean(tool.evidence_id || tool.stdout_hash);
-              const isExpanded = expandedTool === tool.tool_name;
+              const isExpanded = expandedTool === tool.record_key;
 
               return (
-                <React.Fragment key={tool.tool_name}>
+                <React.Fragment key={tool.record_key}>
                   <tr
-                    onClick={() => toggleExpand(tool.tool_name)}
+                    onClick={() => toggleExpand(tool.record_key)}
                     className="hover:bg-zinc-800/40 cursor-pointer transition-colors"
                   >
                     <td className="py-3 px-3 font-semibold text-zinc-200 flex items-center gap-2">
@@ -198,7 +217,7 @@ export default function ReconToolExecutionPanel({ validationResult, title = "Rec
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
                       )}
-                      <span>{tool.tool_name}</span>
+                      <span>{tool.display_name}</span>
                     </td>
 
                     <td className="py-3 px-3">

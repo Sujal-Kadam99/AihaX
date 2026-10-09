@@ -1362,6 +1362,53 @@ MIGRATIONS: list[MigrationEntry] = [
             "SELECT 1;"
         ],
     },
+    {
+        "version": 30,
+        "name": "030_t001_watchschedule_user_ownership_and_webhook_encryption",
+        "up_sql": [
+            # T-001: Add user_id ownership column to watch_schedules.
+            # Nullable to preserve existing rows; new rows always populated by router.
+            "ALTER TABLE watch_schedules ADD COLUMN user_id VARCHAR REFERENCES users(id);",
+            "CREATE INDEX IF NOT EXISTS idx_watch_schedules_user_id ON watch_schedules(user_id);",
+            # SQLite cannot ALTER COLUMN type. EncryptedText handles encryption at the ORM layer.
+            "SELECT 'T-001: alert_webhook encrypted at ORM layer via EncryptedText TypeDecorator';",
+        ],
+    },
+    {
+        "version": 31,
+        "name": "031_stripe_subscription_webhook_state",
+        "up_sql": [
+            "ALTER TABLE subscriptions ADD COLUMN stripe_subscription_id VARCHAR;",
+            "ALTER TABLE subscriptions ADD COLUMN stripe_customer_id VARCHAR;",
+            "ALTER TABLE subscriptions ADD COLUMN stripe_checkout_session_id VARCHAR;",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_stripe_subscription ON subscriptions(stripe_subscription_id);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_stripe_checkout ON subscriptions(stripe_checkout_session_id);",
+            "CREATE TABLE IF NOT EXISTS stripe_webhook_events (event_id VARCHAR PRIMARY KEY, event_type VARCHAR NOT NULL, received_at VARCHAR NOT NULL);",
+        ],
+    },
+    {
+        "version": 32,
+        "name": "032_team_workspaces_and_campaign_membership",
+        "up_sql": [
+            "CREATE TABLE IF NOT EXISTS organizations (id VARCHAR PRIMARY KEY, name VARCHAR(120) NOT NULL, created_by_user_id VARCHAR NOT NULL, created_at DATETIME NOT NULL, FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE RESTRICT);",
+            "CREATE INDEX IF NOT EXISTS idx_organizations_creator ON organizations(created_by_user_id);",
+            "CREATE TABLE IF NOT EXISTS organization_members (id VARCHAR PRIMARY KEY, organization_id VARCHAR NOT NULL, user_id VARCHAR NOT NULL, role VARCHAR(16) NOT NULL DEFAULT 'member', invited_by_user_id VARCHAR, created_at DATETIME NOT NULL, CONSTRAINT uq_organization_member_user UNIQUE(organization_id, user_id), CONSTRAINT ck_organization_member_role CHECK(role IN ('owner', 'admin', 'member', 'viewer')), FOREIGN KEY(organization_id) REFERENCES organizations(id) ON DELETE CASCADE, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY(invited_by_user_id) REFERENCES users(id) ON DELETE SET NULL);",
+            "CREATE INDEX IF NOT EXISTS idx_organization_members_organization ON organization_members(organization_id);",
+            "CREATE INDEX IF NOT EXISTS idx_organization_members_user ON organization_members(user_id);",
+            "ALTER TABLE campaigns ADD COLUMN organization_id VARCHAR REFERENCES organizations(id) ON DELETE SET NULL;",
+            "CREATE INDEX IF NOT EXISTS idx_campaigns_organization ON campaigns(organization_id);",
+        ],
+    },
+    {
+        "version": 33,
+        "name": "033_durable_campaign_recon_runs",
+        "up_sql": [
+            "CREATE TABLE IF NOT EXISTS campaign_recon_runs (id VARCHAR PRIMARY KEY, campaign_id VARCHAR NOT NULL UNIQUE, campaign_mode VARCHAR NOT NULL, assessment_mode VARCHAR NOT NULL DEFAULT 'CONTROLLED', state VARCHAR NOT NULL DEFAULT 'PENDING', authorization_id VARCHAR, scope_hash VARCHAR, selected_capabilities_json TEXT NOT NULL DEFAULT '[]', result_json TEXT, failure_reason TEXT, worker_id VARCHAR, lease_expires_at DATETIME, created_at DATETIME NOT NULL, started_at DATETIME, completed_at DATETIME, FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE);",
+            "CREATE INDEX IF NOT EXISTS idx_campaign_recon_runs_campaign ON campaign_recon_runs(campaign_id);",
+            "CREATE INDEX IF NOT EXISTS idx_campaign_recon_runs_state ON campaign_recon_runs(state);",
+            "CREATE INDEX IF NOT EXISTS idx_campaign_recon_runs_lease ON campaign_recon_runs(lease_expires_at);",
+        ],
+    },
 ]
 
 

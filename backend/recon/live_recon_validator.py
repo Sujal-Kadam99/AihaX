@@ -30,6 +30,7 @@ import asyncio
 import hashlib
 import json
 import logging
+from pathlib import Path
 import re
 import shutil
 import uuid
@@ -51,7 +52,8 @@ from backend.execution.tool_execution_boundary import (
 )
 from backend.models.database import get_utc_now
 from backend.recon.http_probe import HttpProbeEngine
-from backend.recon.models import DiscoveredAsset, DiscoverySource
+from backend.recon.models import AssetType, DiscoveredAsset, DiscoverySource
+from backend.recon.endpoint_discovery import EndpointDiscoveryEngine
 from backend.recon.recon_modes import (
     NormalizedReconAsset,
     ProviderStatus,
@@ -66,6 +68,7 @@ from backend.services.attack_surface_graph import (
     AttackSurfaceGraphEngine,
     AttackSurfaceNodeType,
 )
+from backend.services.request_engine import RequestEngine
 from backend.services.discovery.crtsh_provider import CRTShProvider
 from backend.services.discovery.normalizer import normalize_domain as rfc_normalize_domain
 from backend.services.discovery.normalizer import normalize_url
@@ -191,6 +194,41 @@ class ToolExecutionRecord:
         return d
 
 
+SERVICE_SCAN_PROFILES = {
+    "web_common": {80, 443, 8080, 8443},
+    "all_authorized": None,
+}
+
+def select_service_scan_ports(
+    allowed_ports: Optional[List[int]],
+    excluded_ports: Optional[List[int]],
+    profile: str = "web_common",
+) -> List[int]:
+    """Return only explicitly allowed TCP ports after applying exclusions."""
+    if profile not in SERVICE_SCAN_PROFILES:
+        raise ValueError(f"Unsupported service scan profile: {profile}")
+    allowed = {int(port) for port in (allowed_ports or []) if 1 <= int(port) <= 65535}
+    excluded = {int(port) for port in (excluded_ports or []) if 1 <= int(port) <= 65535}
+    if profile == "web_common":
+        allowed &= SERVICE_SCAN_PROFILES[profile]
+    return sorted(allowed - excluded)
+
+def compress_nmap_port_list(ports: List[int]) -> str:
+    """Compact a sorted authorized port set into Nmap's bounded range syntax."""
+    if not ports:
+        return ""
+    ranges = []
+    start = previous = ports[0]
+    for port in ports[1:]:
+        if port == previous + 1:
+            previous = port
+            continue
+        ranges.append(str(start) if start == previous else f"{start}-{previous}")
+        start = previous = port
+    ranges.append(str(start) if start == previous else f"{start}-{previous}")
+    return ",".join(ranges)
+
+
 # ==============================================================================
 # 4. Phase 25 Validation Suite Result
 # ==============================================================================
@@ -215,6 +253,9 @@ class Phase25ValidationSuiteResult:
     recon_snapshot: Optional[CanonicalReconSnapshot] = None
     attack_surface_graph: Optional[Dict[str, Any]] = None
     cross_tool_correlation: Dict[str, Any] = field(default_factory=dict)
+    host_followup_summary: Dict[str, Any] = field(default_factory=dict)
+    port_scan_coverage: Dict[str, Any] = field(default_factory=dict)
+    endpoint_discovery: Dict[str, Any] = field(default_factory=dict)
     safety_audit_passed: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
@@ -236,6 +277,9 @@ class Phase25ValidationSuiteResult:
             "recon_snapshot_hash": self.recon_snapshot.snapshot_hash if self.recon_snapshot else None,
             "attack_surface_graph": self.attack_surface_graph,
             "cross_tool_correlation": self.cross_tool_correlation,
+            "host_followup_summary": self.host_followup_summary,
+            "port_scan_coverage": self.port_scan_coverage,
+            "endpoint_discovery": self.endpoint_discovery,
             "safety_audit_passed": self.safety_audit_passed,
         }
 
@@ -314,10 +358,15 @@ class LiveReconValidationEngine:
         authorization_record_id: Optional[str] = None,
         operator_confirmed: bool = False,
         scope_assets: Optional[List[str]] = None,
+        out_of_scope_assets: Optional[List[str]] = None,
         db_session: Optional[Any] = None,
         scope_snapshot_hash: Optional[str] = None,
         allow_port_scan: bool = False,
         allow_dir_scan: bool = False,
+        max_host_targets: int = 100,
+        allowed_ports: Optional[List[int]] = None,
+        excluded_ports: Optional[List[int]] = None,
+        service_scan_profile: str = "web_common",
         execution_origin: ExecutionOrigin = ExecutionOrigin.PHASE27_CONTROLLED_PIPELINE,
         pipeline_run_id: Optional[str] = None,
     ) -> Phase25ValidationSuiteResult:
@@ -330,7 +379,10 @@ class LiveReconValidationEngine:
         base_domain = host[4:] if host.startswith("www.") else normalize_domain(host)
 
         effective_scope = scope_assets or [f"https://{host}"]
-        scope_validator = ScopeValidator(in_scope_assets=effective_scope)
+        scope_validator = ScopeValidator(
+            in_scope_assets=effective_scope,
+            out_of_scope_assets=out_of_scope_assets or [],
+        )
 
         # Invariant 1: Single concrete target check
         if "*" in target or " " in target or "," in target:
@@ -567,6 +619,175 @@ class LiveReconValidationEngine:
         tool_records["whatweb"] = rec_whatweb
         self._ingest_tool_assets(rec_whatweb, all_normalized_assets, all_evidence_hashes, provenance_map)
 
+        # Bounded built-in DNS wordlist runs for every campaign mode. Every
+        # candidate is scope checked before DNS resolution; findings are data,
+        # never authorization to probe the resulting host.
+        wordlist_record = ToolExecutionRecord(
+            tool_name="scoped_wordlist",
+            campaign_id=campaign_id,
+            authorization_record_id=auth_rec_id,
+            target=target,
+            scope_snapshot_hash=scope_snapshot_hash,
+            arguments=["labels=api,app,auth,admin,dev,stage,cdn,v1,v2,graphql,internal"],
+        )
+        wordlist_record.record_event(ReconLifecycleEvent.RECON_TOOL_STARTED)
+        wordlist_results: List[Dict[str, Any]] = []
+        try:
+            import dns.resolver
+            resolver = dns.resolver.Resolver()
+            resolver.timeout = 2.0
+            resolver.lifetime = 3.0
+            for label in ("api", "app", "auth", "admin", "dev", "stage", "cdn", "v1", "v2", "graphql", "internal"):
+                candidate = f"{label}.{base_domain}".lower().rstrip(".")
+                if not scope_validator.is_host_in_scope(candidate).allowed:
+                    continue
+                try:
+                    answers = resolver.resolve(candidate, "A")
+                    if not answers:
+                        continue
+                    evidence_hash = hashlib.sha256((candidate + ":" + ",".join(sorted(str(a) for a in answers))).encode("utf-8")).hexdigest()
+                    wordlist_results.append({
+                        "asset": candidate,
+                        "type": "SUBDOMAIN",
+                        "source": "scoped_wordlist",
+                        "authorization_status": "IN_SCOPE",
+                        "evidence_hash": evidence_hash,
+                    })
+                except Exception:
+                    continue
+            wordlist_record.completed_at = get_utc_now().isoformat()
+            wordlist_record.exit_code = 0
+            wordlist_record.normalized_assets = wordlist_results
+            wordlist_record.parsed_result_count = len(wordlist_results)
+            wordlist_record.normalized_result_count = len(wordlist_results)
+            wordlist_record.snapshot_contribution_count = len(wordlist_results)
+            wordlist_record.raw_output = json.dumps([row["asset"] for row in wordlist_results])
+            wordlist_record.raw_output_size = len(wordlist_record.raw_output)
+            wordlist_record.stdout_hash = hashlib.sha256(wordlist_record.raw_output.encode("utf-8")).hexdigest()
+            wordlist_record.evidence_id = wordlist_record.stdout_hash
+            wordlist_record.status = ToolValidationStatus.EXECUTED_RESULTS_NORMALIZED if wordlist_results else ToolValidationStatus.EXECUTED_ZERO_RESULTS
+            wordlist_record.record_event(ReconLifecycleEvent.RECON_TOOL_EXECUTED)
+            wordlist_record.record_event(ReconLifecycleEvent.RECON_TOOL_RESULTS_NORMALIZED)
+        except Exception as exc:
+            wordlist_record.completed_at = get_utc_now().isoformat()
+            wordlist_record.status = ToolValidationStatus.EXECUTION_FAILED
+            wordlist_record.failure_reason = f"Built-in scoped DNS wordlist unavailable: {exc}"
+            wordlist_record.record_event(ReconLifecycleEvent.RECON_TOOL_FAILED, wordlist_record.failure_reason)
+        tool_records["scoped_wordlist"] = wordlist_record
+        self._ingest_tool_assets(wordlist_record, all_normalized_assets, all_evidence_hashes, provenance_map)
+
+        # Common endpoint inventory (robots, sitemap, OpenAPI/Swagger,
+        # GraphQL, HTML links/forms/scripts) is request-engine and scope gated.
+        endpoint_inventory: Dict[str, Any] = {"status": "COMPLETED", "count": 0, "endpoints": [], "login_surfaces": [], "failure_reason": None}
+        try:
+            parsed_root = urlparse(target if "://" in target else f"https://{target}")
+            root_asset = DiscoveredAsset(
+                asset_id=str(uuid.uuid4()),
+                raw_asset=target,
+                canonical_url=target if "://" in target else f"https://{target}",
+                hostname=host,
+                scheme=parsed_root.scheme or "https",
+                port=parsed_root.port or (443 if parsed_root.scheme != "http" else 80),
+                path=parsed_root.path or "/",
+                asset_type=AssetType.WEB_APPLICATION,
+                source=DiscoverySource.USER_INPUT,
+                scope_status="IN_SCOPE",
+            )
+            endpoint_engine = EndpointDiscoveryEngine(
+                request_engine=self.request_engine or RequestEngine(scope_validator=scope_validator, rate_limit_rps=2, max_concurrency=1),
+                scope_validator=scope_validator,
+                max_crawl_depth=2,
+                max_endpoints_per_asset=100,
+            )
+            endpoints = await endpoint_engine.discover_endpoints(root_asset, crawl_html=True, probe_apis=True)
+            endpoint_inventory["endpoints"] = [endpoint.to_dict() for endpoint in endpoints]
+            endpoint_inventory["count"] = len(endpoints)
+            login_markers = ("login", "signin", "sign-in", "auth", "oauth", "sso", "session", "account")
+            endpoint_inventory["login_surfaces"] = [
+                endpoint.to_dict()
+                for endpoint in endpoints
+                if any(marker in f"{endpoint.path} {endpoint.url}".lower() for marker in login_markers)
+                or endpoint.endpoint_type.value == "AUTHENTICATION"
+            ]
+        except Exception as exc:
+            endpoint_inventory["status"] = "EXECUTION_FAILED"
+            endpoint_inventory["failure_reason"] = str(exc)
+
+        # Follow discovered hosts with bounded web inventory. Active Nmap and
+        # Gobuster are fanned out only when separately selected by the operator;
+        # vulnerability scanners remain excluded from this recon phase.
+        discovered_hosts = sorted({
+            str(asset.normalized_value).lower().rstrip(".")
+            for asset in all_normalized_assets
+            if asset.asset_type.upper() in {"SUBDOMAIN", "DOMAIN"}
+            and scope_validator.is_host_in_scope(str(asset.normalized_value)).allowed
+        })
+        root_host = (urlparse(target if "://" in target else f"https://{target}").hostname or "").lower()
+        discovered_hosts = [host for host in discovered_hosts if host != root_host]
+        host_followup_limit = max(0, min(int(max_host_targets), 100))
+        eligible_host_count = len(discovered_hosts)
+        hosts_deferred_by_budget = max(0, eligible_host_count - host_followup_limit)
+        discovered_hosts = discovered_hosts[:host_followup_limit]
+        hosts_followed_up = 0
+        for discovered_host in discovered_hosts:
+            discovered_url = f"https://{discovered_host}"
+            if not validate_destination_safety(discovered_url)[0]:
+                continue
+            # Re-check authorization immediately before the first host request.
+            if not scope_validator.is_host_in_scope(discovered_host).allowed:
+                continue
+            hosts_followed_up += 1
+            host_probe = await self._validate_http_probe(
+                target=discovered_url,
+                campaign_id=campaign_id,
+                auth_id=auth_rec_id,
+                scope_validator=scope_validator,
+                scope_hash=scope_snapshot_hash,
+            )
+            host_key = f"http_probe:{discovered_host}"
+            tool_records[host_key] = host_probe
+            self._ingest_tool_assets(host_probe, all_normalized_assets, all_evidence_hashes, provenance_map)
+
+            # Technology fingerprinting is passive/read-only. Run only when
+            # the selected program authorizes the discovered hostname.
+            host_whatweb = await self._validate_whatweb(
+                target=discovered_url,
+                campaign_id=campaign_id,
+                auth_id=auth_rec_id,
+                scope_validator=scope_validator,
+                scope_hash=scope_snapshot_hash,
+            )
+            tool_records[f"whatweb:{discovered_host}"] = host_whatweb
+            self._ingest_tool_assets(host_whatweb, all_normalized_assets, all_evidence_hashes, provenance_map)
+
+            if allow_port_scan:
+                host_nmap = await self._validate_nmap(
+                    base_domain=discovered_host,
+                    target=discovered_url,
+                    campaign_id=campaign_id,
+                    auth_id=auth_rec_id,
+                    allow_port_scan=True,
+                    scope_validator=scope_validator,
+                    allowed_ports=allowed_ports or [],
+                    excluded_ports=excluded_ports or [],
+                    service_scan_profile=service_scan_profile,
+                    scope_hash=scope_snapshot_hash,
+                )
+                tool_records[f"nmap:{discovered_host}"] = host_nmap
+                self._ingest_tool_assets(host_nmap, all_normalized_assets, all_evidence_hashes, provenance_map)
+
+            if allow_dir_scan:
+                host_gobuster = await self._validate_gobuster(
+                    target=discovered_url,
+                    campaign_id=campaign_id,
+                    auth_id=auth_rec_id,
+                    allow_dir_scan=True,
+                    scope_validator=scope_validator,
+                    scope_hash=scope_snapshot_hash,
+                )
+                tool_records[f"gobuster:{discovered_host}"] = host_gobuster
+                self._ingest_tool_assets(host_gobuster, all_normalized_assets, all_evidence_hashes, provenance_map)
+
         # 10. Nmap
         rec_nmap = await self._validate_nmap(
             base_domain=base_domain,
@@ -576,6 +797,9 @@ class LiveReconValidationEngine:
             allow_port_scan=allow_port_scan,
             scope_validator=scope_validator,
             scope_hash=scope_snapshot_hash,
+            allowed_ports=allowed_ports or [],
+            excluded_ports=excluded_ports or [],
+            service_scan_profile=service_scan_profile,
         )
         tool_records["nmap"] = rec_nmap
         self._ingest_tool_assets(rec_nmap, all_normalized_assets, all_evidence_hashes, provenance_map)
@@ -779,6 +1003,21 @@ class LiveReconValidationEngine:
             tool_records=tool_records,
             recon_snapshot=snapshot,
             attack_surface_graph=graph_dict,
+            port_scan_coverage={
+                "profile": service_scan_profile,
+                "allowed_ports": compress_nmap_port_list(sorted({int(p) for p in (allowed_ports or []) if 1 <= int(p) <= 65535})),
+                "excluded_ports": compress_nmap_port_list(sorted({int(p) for p in (excluded_ports or []) if 1 <= int(p) <= 65535})),
+                "selected_ports": compress_nmap_port_list(select_service_scan_ports(allowed_ports, excluded_ports, service_scan_profile)),
+                "selected_port_count": len(select_service_scan_ports(allowed_ports, excluded_ports, service_scan_profile)),
+            },
+            endpoint_discovery=endpoint_inventory,
+            host_followup_summary={
+                "in_scope_hosts_discovered": eligible_host_count,
+                "hosts_followed_up": hosts_followed_up,
+                "hosts_deferred_by_budget": hosts_deferred_by_budget,
+                "followup_host_limit": host_followup_limit,
+                "followup_profile": ["http_probe", "whatweb"] + (["nmap"] if allow_port_scan else []) + (["gobuster"] if allow_dir_scan else []),
+            },
             cross_tool_correlation={
                 "total_raw_assets": len(all_normalized_assets),
                 "total_deduplicated_assets": len(deduped_assets),
@@ -871,12 +1110,14 @@ class LiveReconValidationEngine:
                 norm_sub = normalize_domain(line)
             except Exception:
                 continue
+            scope_decision = scope_validator.is_host_in_scope(norm_sub)
             norm_assets.append({
                 "source": "subfinder",
                 "source_execution_id": rec.execution_id,
                 "asset": norm_sub,
                 "type": "subdomain",
-                "authorization_status": "DISCOVERED_NOT_AUTHORIZED",
+                "authorization_status": "IN_SCOPE" if scope_decision.allowed else "OUT_OF_SCOPE",
+                "scope_reason": scope_decision.reason,
                 "is_executable": False,
                 "evidence_hash": res.stdout_hash,
             })
@@ -1567,14 +1808,19 @@ class LiveReconValidationEngine:
         allow_port_scan: bool,
         scope_validator: ScopeValidator,
         scope_hash: Optional[str],
+        allowed_ports: Optional[List[int]] = None,
+        excluded_ports: Optional[List[int]] = None,
+        service_scan_profile: str = "web_common",
     ) -> ToolExecutionRecord:
+        scan_ports = select_service_scan_ports(allowed_ports, excluded_ports, service_scan_profile)
+        port_spec = compress_nmap_port_list(scan_ports)
         rec = ToolExecutionRecord(
             tool_name="nmap",
             campaign_id=campaign_id,
             authorization_record_id=auth_id,
             target=target,
             scope_snapshot_hash=scope_hash,
-            arguments=["-sT", "-T4", "--open", base_domain],
+            arguments=["-sT", "-T2", "-p", port_spec, "--open", urlparse(target).hostname or base_domain],
         )
 
         # Invariant: Port scanning requires explicit program authorization
@@ -1582,6 +1828,14 @@ class LiveReconValidationEngine:
             rec.completed_at = get_utc_now().isoformat()
             rec.status = ToolValidationStatus.BLOCKED_POLICY
             rec.failure_reason = "Port scanning is not explicitly authorized under program policy for this validation gate."
+            rec.record_event(ReconLifecycleEvent.RECON_TOOL_BLOCKED, rec.failure_reason)
+            return rec
+
+        # Port scans are opt-in and may only include ports explicitly in scope.
+        if not scan_ports:
+            rec.completed_at = get_utc_now().isoformat()
+            rec.status = ToolValidationStatus.BLOCKED_POLICY
+            rec.failure_reason = "No TCP ports are explicitly authorized for the selected service discovery profile."
             rec.record_event(ReconLifecycleEvent.RECON_TOOL_BLOCKED, rec.failure_reason)
             return rec
 
@@ -1594,15 +1848,25 @@ class LiveReconValidationEngine:
             rec.record_event(ReconLifecycleEvent.RECON_TOOL_FAILED, rec.failure_reason)
             return rec
 
+        parsed_target = urlparse(target if "://" in target else f"https://{target}")
+        scan_host = parsed_target.hostname or base_domain
+        policy_scheme = parsed_target.scheme if parsed_target.scheme in {"http", "https"} else "https"
+        policy_target = f"{policy_scheme}://{scan_host}:{scan_ports[0]}"
         req = ToolExecutionRequest(
             campaign_id=campaign_id,
-            target=target,
+            target=policy_target,
             tool_name="nmap",
             execution_profile=ExecutionProfile.PORT_SERVICE_DISCOVERY.value,
-            args=["-sT", "-T4", "--open", base_domain],
+            args=["-sT", "-T2", "-p", port_spec, "--open", scan_host],
             authorization_confirmed=True,
             custom_executable_path=binary_path,
             execution_mode="AUTHORIZED_LIVE_RECON",
+            # Keep the original authorization rules at the execution boundary;
+            # the concrete URL is not itself proof of authorization.
+            in_scope_assets=scope_validator.raw_in_scope,
+            out_of_scope_assets=scope_validator.raw_out_of_scope,
+            allowed_ports=scan_ports,
+            excluded_ports=excluded_ports or [],
         )
         res = await self.tool_boundary.execute(req)
         rec.completed_at = get_utc_now().isoformat()
@@ -1664,7 +1928,7 @@ class LiveReconValidationEngine:
             authorization_record_id=auth_id,
             target=target,
             scope_snapshot_hash=scope_hash,
-            arguments=["dir", "-u", target, "-q"],
+            arguments=["dir", "-u", target, "-w", str(Path(__file__).resolve().parents[2] / "wordlists" / "common.txt"), "-t", "2", "-q"],
         )
 
         # Invariant: Directory brute force requires explicit policy permission
@@ -1689,10 +1953,13 @@ class LiveReconValidationEngine:
             target=target,
             tool_name="gobuster",
             execution_profile=ExecutionProfile.DIRECTORY_DISCOVERY.value,
-            args=["dir", "-u", target, "-q"],
+            # Use the repository's small bounded list and two workers; never
+            # let an active content discovery run inherit a large system list.
+            args=["dir", "-u", target, "-w", str(Path(__file__).resolve().parents[2] / "wordlists" / "common.txt"), "-t", "2", "-q"],
             authorization_confirmed=True,
             custom_executable_path=binary_path,
             execution_mode="AUTHORIZED_LIVE_RECON",
+            in_scope_assets=[target],
         )
         res = await self.tool_boundary.execute(req)
         rec.completed_at = get_utc_now().isoformat()
@@ -1797,9 +2064,18 @@ class LiveReconValidationEngine:
                     normalized_value=val,
                     asset_type=asset_type,
                     source_provider=record.tool_name,
-                    status=ReconAssetStatus.DISCOVERED,
+                    status=(
+                        ReconAssetStatus.IN_SCOPE
+                        if a.get("authorization_status") == "IN_SCOPE"
+                        else ReconAssetStatus.BLOCKED_SCOPE
+                        if a.get("authorization_status") == "OUT_OF_SCOPE"
+                        else ReconAssetStatus.DISCOVERED
+                    ),
                     is_executable=False,
-                    metadata={"authorization_status": a.get("authorization_status", "DISCOVERED_NOT_AUTHORIZED")},
+                    metadata={
+                        "authorization_status": a.get("authorization_status", "DISCOVERED_NOT_AUTHORIZED"),
+                        "scope_reason": a.get("scope_reason"),
+                    },
                     evidence_hash=a.get("evidence_hash"),
                 )
             )

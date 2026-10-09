@@ -80,6 +80,7 @@ def test_live_preflight_never_generates_network_traffic(db_session, monkeypatch)
         target_url="https://example-preflight.test",
         mode="SAFE_SCAN",
         status="AUTHORIZED",
+        user_id=DummyUser.id,
     )
     db_session.add(c)
 
@@ -88,6 +89,7 @@ def test_live_preflight_never_generates_network_traffic(db_session, monkeypatch)
         campaign_id=c.id,
         authorized_by="lead_operator@aihax.sec",
         authorization_type="explicit_scope_consent",
+        authorization_reference="client-scope-ticket-001",
         authorized_at=datetime.now(timezone.utc),
         expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         scope_hash="a157876a0cf6798e7d7c1ffbc347fe3cf81af9c1fe3460fcb146ca23dc0d2059",
@@ -119,6 +121,7 @@ def test_mock_execution_never_produces_live_validated(db_session):
         target_url="https://example-mock.test",
         mode="SAFE_SCAN",
         status="AUTHORIZED",
+        user_id=DummyUser.id,
     )
     db_session.add(c)
 
@@ -127,6 +130,7 @@ def test_mock_execution_never_produces_live_validated(db_session):
         campaign_id=c.id,
         authorized_by="lead_operator@aihax.sec",
         authorization_type="explicit_scope_consent",
+        authorization_reference="client-scope-ticket-002",
         authorized_at=datetime.now(timezone.utc),
         expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         scope_hash="33f91ee87bdc686fdfbac48977a8df58c23eeb6ddaf8491ef77e19d5fc71fffd",
@@ -174,6 +178,7 @@ def test_unauthorized_campaign_blocks_preflight_and_validation(db_session):
         target_url="https://example-unauth.test",
         mode="SAFE_SCAN",
         status="CREATED",
+        user_id=DummyUser.id,
     )
     db_session.add(c)
     db_session.commit()
@@ -200,6 +205,87 @@ def test_unauthorized_campaign_blocks_preflight_and_validation(db_session):
         app.dependency_overrides.pop(get_db, None)
 
 
+@pytest.mark.asyncio
+async def test_live_recon_requires_all_operator_confirmations(db_session):
+    from backend.services.operator_live_recon_service import OperatorLiveReconService
+
+    with pytest.raises(ValueError, match="explicit operator confirmations"):
+        await OperatorLiveReconService.execute_validation_run(
+            campaign_id="camp-live-confirmations-required",
+            payload={"confirmations": {"authActive": True}},
+            mode="live",
+            db=db_session,
+        )
+    assert db_session.query(AuditTrailEvent).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_live_recon_enables_only_operator_selected_active_capabilities(db_session, monkeypatch):
+    from types import SimpleNamespace
+    from backend.services import operator_live_recon_service as service_module
+
+    campaign = Campaign(
+        id="camp-live-capability-selection",
+        name="Capability Selection",
+        target_url="https://authorized.example.test",
+        mode="SAFE_SCAN",
+        status="AUTHORIZED",
+        user_id=DummyUser.id,
+    )
+    db_session.add(campaign)
+    db_session.commit()
+
+    async def fake_preflight(cls, campaign_id, db):
+        return {
+            "can_launch": True,
+            "target": campaign.target_url,
+            "authorization": {"authorization_id": "auth-live-test"},
+            "scope": {"scope_hash": "scope-hash", "in_scope_rules": ["example.test", "*.example.test"], "out_of_scope_rules": ["private.example.test"], "allowed_ports": [80, 443, 8443], "excluded_ports": [443]},
+            "safety_budget": {"max_discovered_hosts": 100},
+            "permitted_capabilities": {"service_discovery": False, "content_discovery": False},
+        }
+
+    captured = {}
+
+    class FakeLiveEngine:
+        async def execute_validation_suite(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(suite_status="COMPLETED", tool_records={})
+
+    monkeypatch.setattr(service_module.OperatorLiveReconService, "get_preflight", classmethod(fake_preflight))
+    monkeypatch.setattr("backend.recon.live_recon_validator.LiveReconValidationEngine", FakeLiveEngine)
+
+    result = await service_module.OperatorLiveReconService.execute_validation_run(
+        campaign_id=campaign.id,
+        payload={
+            "confirmations": {
+                "authActive": True,
+                "targetCorrect": True,
+                "capabilitiesReviewed": True,
+                "liveTrafficAcknowledged": True,
+            },
+            "selected_capabilities": ["service_discovery"],
+            "port_scan_profile": "all_authorized",
+        },
+        mode="live",
+        db=db_session,
+    )
+
+    assert result["execution_mode"] == "AUTHORIZED_LIVE_RECON"
+    assert captured["allow_port_scan"] is True
+    assert captured["allow_dir_scan"] is False
+    assert captured["max_host_targets"] == 100
+    assert captured["scope_assets"] == ["example.test", "*.example.test"]
+    assert captured["out_of_scope_assets"] == ["private.example.test"]
+    assert captured["allowed_ports"] == [80, 443, 8443]
+    assert captured["excluded_ports"] == [443]
+    assert captured["service_scan_profile"] == "all_authorized"
+    audit = db_session.query(AuditTrailEvent).filter_by(campaign_id=campaign.id).one()
+    audit_metadata = json.loads(audit.metadata_json)
+    assert audit_metadata["selected_capabilities"] == ["service_discovery"]
+    assert audit_metadata["port_scan_profile"] == "all_authorized"
+
+
 def test_audit_event_logged_without_evidence_mutation(db_session):
     """Assert mock validation logs an AuditTrailEvent but creates 0 LIVE_VALIDATED evidence records."""
     c = Campaign(
@@ -208,6 +294,7 @@ def test_audit_event_logged_without_evidence_mutation(db_session):
         target_url="https://example-audit.test",
         mode="SAFE_SCAN",
         status="AUTHORIZED",
+        user_id=DummyUser.id,
     )
     db_session.add(c)
 
@@ -216,6 +303,7 @@ def test_audit_event_logged_without_evidence_mutation(db_session):
         campaign_id=c.id,
         authorized_by="lead_operator@aihax.sec",
         authorization_type="explicit_scope_consent",
+        authorization_reference="client-scope-ticket-004",
         authorized_at=datetime.now(timezone.utc),
         expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         scope_hash="33f91ee87bdc686fdfbac48977a8df58c23eeb6ddaf8491ef77e19d5fc71fffd",

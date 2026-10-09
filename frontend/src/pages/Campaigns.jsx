@@ -49,6 +49,7 @@ import {
   getCampaignEvidence,
   getCampaignFindings,
   getCampaignReconDiagnostics,
+  getCampaignReconRun,
 } from '../lib/api';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -76,6 +77,7 @@ export default function Campaigns() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [reproductionResult, setReproductionResult] = useState(null);
   const [reconDiagnostics, setReconDiagnostics] = useState(null);
+  const [reconRun, setReconRun] = useState(null);
 
 
   useEffect(() => {
@@ -144,11 +146,12 @@ export default function Campaigns() {
 
       // Query diagnostic runtime truth, evidence, and findings in parallel
       try {
-        const [rtRes, evRes, fRes, diagRes] = await Promise.allSettled([
+        const [rtRes, evRes, fRes, diagRes, reconRunRes] = await Promise.allSettled([
           getCampaignRuntime(id),
           getCampaignEvidence(id),
           getCampaignFindings(id),
           getCampaignReconDiagnostics(id),
+          getCampaignReconRun(id),
         ]);
 
         if (rtRes.status === 'fulfilled') {
@@ -171,6 +174,9 @@ export default function Campaigns() {
         if (diagRes.status === 'fulfilled') {
           const diag = diagRes.value.data?.tool_records || diagRes.value.data?.data?.tool_records;
           if (diag) setReconDiagnostics(diag);
+        }
+        if (reconRunRes.status === 'fulfilled') {
+          setReconRun(reconRunRes.value.data?.data || null);
         }
       } catch {
         // non-blocking
@@ -876,6 +882,31 @@ export default function Campaigns() {
                     </div>
                   </div>
                 </div>
+
+                {reconRun && (
+                  <div className="rounded border border-border bg-surface-2/50 p-3 space-y-2 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-text-primary">Shared Recon Run</span>
+                      <Badge variant={reconRun.state === 'COMPLETED' ? 'success' : reconRun.state === 'RUNNING' ? 'accent' : ['FAILED', 'BLOCKED'].includes(reconRun.state) ? 'danger' : 'secondary'}>
+                        {reconRun.state}
+                      </Badge>
+                    </div>
+                    {reconRun.failure_reason && <p className="text-rose-300">{reconRun.failure_reason}</p>}
+                    {reconRun.result && (
+                      <div className="text-text-secondary space-y-1">
+                        <p>Tools recorded: {Object.keys(reconRun.result.tool_records || {}).length} &bull; Endpoints found: {reconRun.result.endpoint_discovery?.count ?? 0} &bull; Login surfaces: {reconRun.result.endpoint_discovery?.login_surfaces?.length ?? 0}</p>
+                        <p>Host follow-up: {reconRun.result.host_followup_summary?.hosts_followed_up ?? 0} &bull; Nmap/Gobuster: {reconRun.selected_capabilities?.length ? reconRun.selected_capabilities.join(', ') : 'not selected'}</p>
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {Object.entries(reconRun.result.tool_records || {}).map(([toolName, record]) => (
+                            <span key={toolName} title={record.failure_reason || record.status} className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">
+                              {toolName}: {record.status}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Detailed Metric Counters */}
                 <div className="grid grid-cols-3 gap-3 text-xs">

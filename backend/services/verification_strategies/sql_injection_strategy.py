@@ -24,6 +24,9 @@ class SqlInjectionVerificationStrategy(BaseVerificationStrategy):
         "ORA-01756",
         "PostgreSQL query failed",
         "SQLite/JDBCDriver",
+        "SQLITE_ERROR: incomplete input",
+        "SQLITE_ERROR: near",
+        "SQLite error",
         "Unclosed quotation mark after the character string",
     ]
 
@@ -72,8 +75,12 @@ class SqlInjectionVerificationStrategy(BaseVerificationStrategy):
 
         baseline_body_lower = (resp_baseline.response_body or "").lower()
 
-        # 2. Error-Based Testing
-        spec_error = build_injected_request(candidate, "'")
+        # 2. Replay the exact candidate payload first. A finding should only
+        # verify when the same observed input reproduces a DB-specific signal.
+        exact_payload = candidate.get("payload")
+        spec_error = build_injected_request(candidate, str(exact_payload)) if exact_payload else None
+        if not spec_error:
+            spec_error = build_injected_request(candidate, "'")
         resp_error = await send_safe(spec_error)
 
         if resp_error and resp_error.success and resp_error.response_body:
@@ -83,7 +90,7 @@ class SqlInjectionVerificationStrategy(BaseVerificationStrategy):
                 if err.lower() in body_lower and err.lower() not in baseline_body_lower:
                     ev_id = context.record_evidence(
                         evidence_type="sql_error_detected",
-                        data={"matched_error": err, "payload_used": "'"},
+                        data={"matched_error": err, "payload_used": exact_payload or "'", "baseline_status": resp_baseline.response_status, "injected_status": resp_error.response_status},
                         request_id=resp_error.request_id,
                     )
                     return VerificationConclusion(

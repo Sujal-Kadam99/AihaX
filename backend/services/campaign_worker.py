@@ -148,6 +148,16 @@ class CampaignWorker:
             logger.info(f"Aborting task {task_id}: Campaign {campaign.id} is in state {campaign.status}.")
             return {"status": "aborted", "reason": f"Campaign state is {campaign.status}"}
 
+        recon_run = repo.get_recon_run(campaign.id)
+        if not recon_run or recon_run.state != "COMPLETED":
+            repo.fail_task(task_id, self.worker_id, "Campaign recon must complete before vulnerability checks.", can_retry=False)
+            session.commit()
+            return {"status": "blocked", "reason": "Campaign recon has not completed."}
+        if str(campaign.mode or "").upper() in {"RECON_ONLY", "PLAN_ONLY"}:
+            repo.fail_task(task_id, self.worker_id, "Vulnerability checks are disabled in recon-only and plan-only modes.", can_retry=False)
+            session.commit()
+            return {"status": "blocked", "reason": "Vulnerability checks are disabled for this campaign mode."}
+
         # Transition task to RUNNING if not already
         if task.status == TaskLifecycleState.CLAIMED.value:
             task.status = TaskLifecycleState.RUNNING.value
@@ -574,7 +584,22 @@ class CampaignWorker:
         active_or_pending = counts.get("PENDING", 0) + counts.get("CLAIMED", 0) + counts.get("RUNNING", 0) + counts.get("RETRY_PENDING", 0)
         total_tasks = sum(counts.values())
 
-        if total_tasks > 0 and active_or_pending == 0:
+        recon_run = repo.get_recon_run(campaign_id)
+        recon_ready = bool(recon_run and recon_run.state == "COMPLETED")
+        if recon_run and recon_run.state in {"FAILED", "BLOCKED"}:
+            try:
+                repo.update_campaign_status(
+                    campaign_id=campaign_id,
+                    target_status=CampaignLifecycleState.FAILED,
+                    actor=self.worker_id,
+                    reason=f"Recon {recon_run.state.lower()}: {recon_run.failure_reason or 'recon did not complete'}",
+                )
+                session.commit()
+            except Exception:
+                session.rollback()
+            return
+        is_recon_only = str(campaign.mode or "").upper() in {"RECON_ONLY", "PLAN_ONLY"}
+        if recon_ready and active_or_pending == 0 and (total_tasks > 0 or is_recon_only):
             logger.info(f"All {total_tasks} tasks for campaign {campaign_id} finished. Transitioning to COMPLETED.")
             from backend.services.campaign_operations import CampaignOperationsService
             ops = CampaignOperationsService(repo)
@@ -663,6 +688,7 @@ class CampaignWorkerRuntime:
 
             # 1. Recover stale tasks across all campaigns
             repo.recover_stale_tasks()
+            repo.recover_stale_recon_runs()
             session.commit()
 
             # 2. Find all RUNNING campaigns
@@ -673,6 +699,40 @@ class CampaignWorkerRuntime:
             )
 
             for campaign in running_campaigns:
+                recon_run = repo.get_recon_run(campaign.id)
+                if not recon_run:
+                    auth = repo.get_authorization(campaign.id)
+                    repo.create_recon_run(campaign, auth.id if auth else None, auth.scope_hash if auth else None)
+                    session.commit()
+                    recon_run = repo.get_recon_run(campaign.id)
+                if recon_run and recon_run.state == "PENDING":
+                    claimed_recon = repo.claim_next_recon_run(
+                        worker_id=self.worker.worker_id,
+                        lease_seconds=max(self.worker.lease_duration_seconds, 600),
+                        campaign_id=campaign.id,
+                    )
+                    session.commit()
+                    if claimed_recon:
+                        from backend.services.campaign_recon_service import CampaignReconService
+                        recon_id = claimed_recon.id
+                        try:
+                            result = await CampaignReconService.execute(campaign.id, session)
+                            repo.complete_recon_run(recon_id, json.dumps(result, sort_keys=True, default=str), self.worker.worker_id)
+                            session.commit()
+                        except Exception as recon_error:
+                            session.rollback()
+                            repo.fail_recon_run(recon_id, str(recon_error), blocked=True, worker_id=self.worker.worker_id)
+                            repo.update_campaign_status(
+                                campaign_id=campaign.id,
+                                target_status=CampaignLifecycleState.FAILED,
+                                actor=self.worker.worker_id,
+                                reason=f"Recon preflight or execution blocked: {recon_error}",
+                            )
+                            session.commit()
+                            continue
+                    recon_run = repo.get_recon_run(campaign.id)
+                if not recon_run or recon_run.state != "COMPLETED":
+                    continue
                 # 3. Atomically claim claimable tasks for this campaign
                 claimed_tasks = repo.claim_tasks(
                     campaign_id=campaign.id,

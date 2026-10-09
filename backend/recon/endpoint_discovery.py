@@ -68,6 +68,10 @@ class EndpointDiscoveryEngine:
             if not scope_dec.allowed:
                 return
 
+            # Keep query parameter names as observed input metadata, but do not
+            # retain potentially sensitive values in the discovered URL.
+            source_query_params = list(parse_qs(urlparse(url).query, keep_blank_values=True).keys())
+
             # Canonical URL fingerprint
             try:
                 norm = AssetNormalizer.normalize(url)
@@ -84,8 +88,7 @@ class EndpointDiscoveryEngine:
                 return
 
             parsed = urlparse(canonical_url)
-            query_params = list(parse_qs(parsed.query).keys())
-            all_params = list(set((params or []) + query_params))
+            all_params = list(dict.fromkeys((params or []) + source_query_params))
 
             discovered.append(DiscoveredEndpoint(
                 endpoint_id=str(uuid.uuid4()),
@@ -279,7 +282,49 @@ class EndpointDiscoveryEngine:
             return
 
         js_content = resp.response_body
-        # Regex patterns for REST endpoints and routes
+        # Extract literal API/REST routes from both ordinary strings and JS
+        # template strings. Dynamic values are replaced with a benign marker;
+        # only route and parameter names are passed to later checks.
+        route_pattern = re.compile(
+            r"/(?:api|rest|v[0-9]+|graphql)/[A-Za-z0-9_/${}.?=&:%-]+",
+            re.IGNORECASE,
+        )
+        seen_routes: set[tuple[str, str]] = set()
+        for match in route_pattern.finditer(js_content):
+            route = re.sub(r"\$\{[^}]*\}", "1", match.group(0))
+            route = route.rstrip(".,;)")
+            if not route.startswith("/"):
+                continue
+
+            method = "POST" if "/graphql" in route.lower() else "GET"
+            prefix = js_content[max(0, match.start() - 180):match.start()]
+            for candidate_method in ("POST", "PUT", "PATCH", "DELETE"):
+                if re.search(rf"\.\s*{candidate_method.lower()}\s*\([^)]*$", prefix, re.IGNORECASE):
+                    method = candidate_method
+                    break
+
+            route_url = urljoin(base_url.rstrip("/") + "/", route.lstrip("/"))
+            route_params = list(parse_qs(urlparse(route_url).query, keep_blank_values=True).keys())
+            # Store a clean endpoint URL and carry query parameter names in
+            # metadata. Parameter values from source code can be dynamic or
+            # sensitive and must not be replayed as-is.
+            route_url = urlparse(route_url)._replace(query="", fragment="").geturl()
+            route_key = (method, route_url)
+            if route_key in seen_routes:
+                continue
+            seen_routes.add(route_key)
+            is_graphql = "/graphql" in route_url.lower()
+            add_fn(
+                route_url,
+                method=method,
+                ep_type=EndpointType.GRAPHQL if is_graphql else EndpointType.API,
+                source=DiscoverySource.JS_ANALYSIS,
+                params=route_params,
+                is_api=True,
+                is_graphql=is_graphql,
+            )
+
+        # Existing patterns cover common API client forms and versioned routes.
         api_patterns = [
             r'["\'](/api/v[0-9]/[a-zA-Z0-9_\-/]+)["\']',
             r'["\'](/api/[a-zA-Z0-9_\-/]+)["\']',

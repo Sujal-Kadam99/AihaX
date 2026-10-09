@@ -13,6 +13,7 @@ import {
   Sun,
   Moon,
   User as UserIcon,
+  Users,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
@@ -27,6 +28,7 @@ const navItems = [
   { to: '/reports', icon: FileText, label: 'Reports' },
   { to: '/evidence', icon: Database, label: 'Evidence' },
   { to: '/audit', icon: History, label: 'Audit' },
+  { to: '/workspaces', icon: Users, label: 'Workspaces' },
 ];
 
 export default function Layout() {

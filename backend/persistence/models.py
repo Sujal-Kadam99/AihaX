@@ -45,6 +45,7 @@ class Campaign(Base):
 
     program_id = Column(String, ForeignKey("programs.id", ondelete="SET NULL"), nullable=True, index=True)
     user_id = Column(String, nullable=True, index=True)
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
 
     created_at = Column(UTCDateTime, default=get_utc_now, nullable=False, index=True)
     started_at = Column(UTCDateTime, nullable=True)
@@ -70,6 +71,7 @@ class Campaign(Base):
     evidence_records = relationship("EvidenceRecord", back_populates="campaign", cascade="all, delete-orphan")
     audit_events = relationship("AuditTrailEvent", back_populates="campaign", cascade="all, delete-orphan")
     snapshot = relationship("CampaignSnapshot", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
+    organization = relationship("Organization", back_populates="campaigns")
 
 
 class CampaignTarget(Base):
@@ -116,6 +118,28 @@ class ExecutionTask(Base):
     idempotency_key = Column(String, unique=True, nullable=True, index=True)
 
     campaign = relationship("Campaign", back_populates="tasks")
+
+
+class CampaignReconRun(Base):
+    """Durable, mode-independent recon work queued ahead of campaign checks."""
+
+    __tablename__ = "campaign_recon_runs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    campaign_id = Column(String, ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    campaign_mode = Column(String, nullable=False)
+    assessment_mode = Column(String, nullable=False, default="CONTROLLED")
+    state = Column(String, nullable=False, default="PENDING", index=True)
+    authorization_id = Column(String, nullable=True)
+    scope_hash = Column(String, nullable=True)
+    selected_capabilities_json = Column(Text, nullable=False, default="[]")
+    result_json = Column(Text, nullable=True)
+    failure_reason = Column(Text, nullable=True)
+    worker_id = Column(String, nullable=True)
+    lease_expires_at = Column(UTCDateTime, nullable=True, index=True)
+    created_at = Column(UTCDateTime, default=get_utc_now, nullable=False)
+    started_at = Column(UTCDateTime, nullable=True)
+    completed_at = Column(UTCDateTime, nullable=True)
 
 
 class AuthorizationRecord(Base):

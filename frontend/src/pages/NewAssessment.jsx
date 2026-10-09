@@ -46,7 +46,7 @@ export default function NewAssessment() {
 
   // Authorization State
   const [authorizedBy, setAuthorizedBy] = useState('lead_security_operator');
-  const [authReference, setAuthReference] = useState('SECURITY-TICKET-AUTHORIZED');
+  const [authReference, setAuthReference] = useState('');
   const [durationDays, setDurationDays] = useState(30);
 
   // Assessment Configuration
@@ -57,11 +57,13 @@ export default function NewAssessment() {
   const [checkBudget, setCheckBudget] = useState(20);
   const [maxConcurrency, setMaxConcurrency] = useState(5);
   const [operatorConfirmed, setOperatorConfirmed] = useState(false);
+  const [selectedReconCapabilities, setSelectedReconCapabilities] = useState([]);
 
   // Launching state
   const [starting, setStarting] = useState(false);
 
   const isProduction = assessmentMode === 'PRODUCTION_AUTHORIZED';
+  const isReconOnly = mode === 'RECON_ONLY';
   const confirmationText =
     'I confirm this concrete target is authorized under the selected bug-bounty program and I understand this assessment will perform real requests.';
 
@@ -200,22 +202,32 @@ export default function NewAssessment() {
       return;
     }
 
+    if (!authReference.trim()) {
+      addToast({
+        title: 'Authorization Reference Required',
+        message: 'Enter the client ticket, contract, or other written scope reference before creating the campaign.',
+        type: 'warning',
+      });
+      return;
+    }
+
     try {
       setStarting(true);
       const targetHostname = urlCheck.host || cleanUrl;
 
       // 1. Create Campaign in DRAFT with exact validated concrete target
       const createRes = await createCampaign({
-        name: isProduction ? `Production: ${targetHostname}` : `Assessment: ${targetHostname}`,
+        name: isReconOnly ? `Recon: ${targetHostname}` : isProduction ? `Production: ${targetHostname}` : `Assessment: ${targetHostname}`,
         target_url: cleanUrl,
-        mode: isProduction ? 'SAFE_SCAN' : mode,
+        mode: isReconOnly ? 'RECON_ONLY' : isProduction ? 'SAFE_SCAN' : mode,
         program_id: selectedProgramId,
-        campaign_budget: isProduction ? 10 : Math.max(1, parseInt(campaignBudget, 10) || 500),
-        target_budget: isProduction ? 10 : Math.max(1, parseInt(targetBudget, 10) || 100),
-        check_budget: isProduction ? 5 : Math.max(1, parseInt(checkBudget, 10) || 20),
-        max_concurrency: isProduction ? 1 : Math.max(1, parseInt(maxConcurrency, 10) || 5),
-        rate_limit_rps: isProduction ? 2 : 10,
+        campaign_budget: isReconOnly ? 100 : isProduction ? 10 : Math.max(1, parseInt(campaignBudget, 10) || 500),
+        target_budget: isReconOnly ? 100 : isProduction ? 10 : Math.max(1, parseInt(targetBudget, 10) || 100),
+        check_budget: isReconOnly ? 1 : isProduction ? 5 : Math.max(1, parseInt(checkBudget, 10) || 20),
+        max_concurrency: isReconOnly || isProduction ? 1 : Math.max(1, parseInt(maxConcurrency, 10) || 5),
+        rate_limit_rps: isReconOnly || isProduction ? 2 : 10,
         in_scope_assets: [cleanUrl],
+        selected_recon_capabilities: selectedReconCapabilities,
       });
 
       const campaignId = createRes.data?.data?.campaign_id || createRes.data?.data?.id;
@@ -224,7 +236,7 @@ export default function NewAssessment() {
       await authorizeCampaign(campaignId, {
         authorized_by: authorizedBy || 'lead_security_operator',
         authorization_type: isProduction ? 'bug_bounty_program_authorization' : 'explicit_scope_consent',
-        authorization_reference: authReference || 'SECURITY-TICKET-AUTHORIZED',
+        authorization_reference: authReference.trim(),
         duration_days: Math.max(1, parseInt(durationDays, 10) || 30),
       });
 
@@ -232,8 +244,8 @@ export default function NewAssessment() {
       await startCampaign(campaignId);
 
       addToast({
-        title: isProduction ? 'Authorized Assessment Launched' : 'Assessment Started',
-        message: `Campaign ${campaignId?.slice(0, 8)} launched in ${isProduction ? 'PRODUCTION_AUTHORIZED' : mode} mode.`,
+        title: isReconOnly ? 'Recon-Only Campaign Started' : isProduction ? 'Authorized Assessment Launched' : 'Assessment Started',
+        message: `Campaign ${campaignId?.slice(0, 8)} launched in ${isReconOnly ? 'RECON_ONLY' : isProduction ? 'PRODUCTION_AUTHORIZED' : mode} mode.`,
         type: 'success',
       });
 
@@ -555,16 +567,36 @@ export default function NewAssessment() {
               </div>
             </div>
 
-            {isProduction ? (
+            <div className="rounded border border-border p-3 space-y-2">
+              <p className="text-xs font-semibold text-text-primary">Optional active recon tools (off by default)</p>
+              <p className="text-[11px] text-text-muted">Nmap service discovery and Gobuster path discovery run only when selected. They stay scope checked and use bounded profiles.</p>
+              <div className="flex flex-wrap gap-4 text-xs">
+                {[['service_discovery', 'Nmap service discovery'], ['content_discovery', 'Gobuster path discovery']].map(([capability, label]) => (
+                  <label key={capability} className="inline-flex items-center gap-2 text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={selectedReconCapabilities.includes(capability)}
+                      onChange={(event) => setSelectedReconCapabilities((current) => event.target.checked
+                        ? [...new Set([...current, capability])]
+                        : current.filter((item) => item !== capability))}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {isProduction || isReconOnly ? (
               <div className="p-3.5 rounded bg-amber-950/20 border border-amber-800/40 text-xs space-y-2">
                 <div className="flex items-center gap-2 font-semibold text-amber-300 text-xs">
                   <Lock className="w-3.5 h-3.5" aria-hidden="true" focusable="false" />
-                  <span>CONSERVATIVE PRODUCTION PROFILE (LOCKED BY SERVER)</span>
+                  <span>{isReconOnly ? 'RECON-ONLY PROFILE (BOUNDED)' : 'CONSERVATIVE PRODUCTION PROFILE (LOCKED BY SERVER)'}</span>
                 </div>
+                {isReconOnly && <p className="text-[11px] text-text-secondary">The campaign runs the shared scoped recon pipeline. Vulnerability checks are not launched. Nmap and Gobuster run only if selected above.</p>}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px]">
                   <div className="p-2 rounded bg-surface border border-border/60">
                     <span className="text-text-muted block text-[10px]">BUDGET</span>
-                    <span className="text-amber-400 font-bold">10 Max Requests</span>
+                    <span className="text-amber-400 font-bold">{isReconOnly ? '100 Max Requests' : '10 Max Requests'}</span>
                   </div>
                   <div className="p-2 rounded bg-surface border border-border/60">
                     <span className="text-text-muted block text-[10px]">CONCURRENCY</span>
@@ -641,13 +673,15 @@ export default function NewAssessment() {
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-accent" aria-hidden="true" focusable="false" />
                     <h2 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
-                      {isProduction
-                        ? 'PRODUCTION AUTHORIZED ASSESSMENT — PRE-FLIGHT READINESS'
-                        : 'CONTROLLED ASSESSMENT — PRE-FLIGHT READINESS'}
+                      {isReconOnly
+                        ? 'RECON-ONLY CAMPAIGN — PRE-FLIGHT READINESS'
+                        : isProduction
+                          ? 'PRODUCTION AUTHORIZED ASSESSMENT — PRE-FLIGHT READINESS'
+                          : 'CONTROLLED ASSESSMENT — PRE-FLIGHT READINESS'}
                     </h2>
                   </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent/10 text-accent font-semibold">
-                    MODE: {isProduction ? 'PRODUCTION_AUTHORIZED' : mode}
+                    MODE: {isReconOnly ? 'RECON_ONLY' : isProduction ? 'PRODUCTION_AUTHORIZED' : mode}
                   </span>
                 </div>
 
@@ -782,7 +816,7 @@ export default function NewAssessment() {
             onClick={handleStartAssessment}
           >
             <Play className="w-4 h-4" aria-hidden="true" focusable="false" />
-            <span>{isProduction ? 'Launch Authorized Assessment' : 'Launch Controlled Assessment'}</span>
+            <span>{isReconOnly ? 'Launch Recon-Only Campaign' : isProduction ? 'Launch Authorized Assessment' : 'Launch Controlled Assessment'}</span>
           </Button>
         </div>
       </div>

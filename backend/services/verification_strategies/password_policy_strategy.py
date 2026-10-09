@@ -56,6 +56,15 @@ class PasswordPolicyVerificationStrategy(BaseVerificationStrategy):
 
             tested_request_ids.append(resp.request_id)
             body_lower = (resp.response_body or "").lower()
+            content_type = next(
+                (value for key, value in resp.response_headers.items() if key.lower() == "content-type"),
+                "",
+            ).lower()
+
+            # A SPA fallback may answer POST /register with HTTP 200 HTML without
+            # creating an account. That response cannot prove password acceptance.
+            if "application/json" not in content_type:
+                continue
 
             # If rejected with validation error regarding password policy
             if resp.response_status in (400, 422) or ("password" in body_lower and ("too short" in body_lower or "complexity" in body_lower or "at least" in body_lower or "character" in body_lower)):
@@ -63,7 +72,7 @@ class PasswordPolicyVerificationStrategy(BaseVerificationStrategy):
                 continue
 
             # If accepted with 200 or 201 Created or success message
-            if resp.response_status in (200, 201):
+            if resp.response_status in (200, 201) and test_user.lower() in body_lower:
                 ev_id = context.record_evidence(
                     evidence_type="weak_password_accepted",
                     data={

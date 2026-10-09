@@ -235,7 +235,7 @@ class ReconAgent(BaseAgent):
         cfg = ReconExecutionConfig(
             campaign_id=self.scan_id,
             target_url=target_url,
-            authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+            authorization_confirmed=bool(self.config.get("authorization_confirmed", False)),
             in_scope_assets=self.config.get("in_scope_assets", [target_url] if target_url else []),
             out_of_scope_assets=self.config.get("out_of_scope_assets", []),
             allowed_ports=self.config.get("allowed_ports", []),
@@ -250,7 +250,7 @@ class ReconAgent(BaseAgent):
             enable_tls_analysis=bool(self.config.get("enable_tls_analysis", True)),
             timeout_per_tool=int(self.config.get("timeout_per_tool", 60)),
             allow_loopback=bool(self.config.get("allow_loopback", False)),
-            execution_mode=str(self.config.get("execution_mode", "AUTHORIZED_LIVE_RECON" if bool(self.config.get("authorization_confirmed", True)) else "AUDIT")),
+            execution_mode=str(self.config.get("execution_mode", "AUDIT")),
             wordlist_path=Path(self.config["wordlist_path"]) if "wordlist_path" in self.config else _DEFAULT_WORDLIST,
         )
 
@@ -718,7 +718,7 @@ class ReconAgent(BaseAgent):
                 katana_args.extend(["-H", f"{k}: {v}"])
 
         in_scope = self.config.get("in_scope_assets", [target_url])
-        exec_mode = str(self.config.get("execution_mode", "AUTHORIZED_LIVE_RECON" if bool(self.config.get("authorization_confirmed", True)) else "AUDIT"))
+        exec_mode = str(self.config.get("execution_mode", "AUDIT"))
         katana_res = await self.tool_boundary.execute(
             ToolExecutionRequest(
                 campaign_id=self.scan_id,
@@ -727,7 +727,7 @@ class ReconAgent(BaseAgent):
                 execution_profile=ExecutionProfile.URL_DISCOVERY.value,
                 args=katana_args,
                 timeout_seconds=int(self.config.get("timeout_per_tool", 60)) * 2,
-                authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+                authorization_confirmed=bool(self.config.get("authorization_confirmed", False)),
                 execution_mode=exec_mode,
                 in_scope_assets=in_scope,
                 out_of_scope_assets=self.config.get("out_of_scope_assets", []),
@@ -758,7 +758,7 @@ class ReconAgent(BaseAgent):
             campaign_id=self.scan_id,
             target_url=target_url,
             allow_loopback=bool(self.config.get("allow_loopback", False)),
-            authorization_confirmed=bool(self.config.get("authorization_confirmed", True)),
+            authorization_confirmed=bool(self.config.get("authorization_confirmed", False)),
             execution_mode=exec_mode,
         )
         graph_snapshot = self._populate_attack_surface_graph(

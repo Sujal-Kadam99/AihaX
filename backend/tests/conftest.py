@@ -1,10 +1,29 @@
 import os
+import base64
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 # Set required env vars BEFORE any backend imports so get_settings() succeeds at module load time
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-pytest-only")
 os.environ.setdefault("AIHAX_MASTER_KEY", "test-master-key-for-pytest-only")
 os.environ.setdefault("DATABASE_URL", "sqlite:///")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
+
+# Each pytest process receives ephemeral issuer/verifier keys. They are test
+# fixtures only and are never written to the repository or reused in releases.
+_test_entitlement_key = Ed25519PrivateKey.generate()
+_test_private_pem = _test_entitlement_key.private_bytes(
+    serialization.Encoding.PEM,
+    serialization.PrivateFormat.PKCS8,
+    serialization.NoEncryption(),
+)
+_test_public_pem = _test_entitlement_key.public_key().public_bytes(
+    serialization.Encoding.PEM,
+    serialization.PublicFormat.SubjectPublicKeyInfo,
+)
+os.environ["ENTITLEMENT_SIGNING_PRIVATE_KEY"] = base64.b64encode(_test_private_pem).decode("ascii")
+os.environ["ENTITLEMENT_VERIFICATION_PUBLIC_KEY"] = base64.b64encode(_test_public_pem).decode("ascii")
 
 import pytest
 from fastapi.testclient import TestClient

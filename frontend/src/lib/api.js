@@ -58,6 +58,7 @@ export const getCampaignStatus = (id) => api.get(`/api/campaigns/${id}/status`);
 export const getCampaignPreflight = (id) => api.get(`/api/campaigns/${id}/preflight`);
 export const getCampaignRuntime = (id, params) => api.get(`/api/campaigns/${id}/runtime`, { params });
 export const getCampaignReconDiagnostics = (id) => api.get(`/api/campaigns/${id}/recon-diagnostics`);
+export const getCampaignReconRun = (id) => api.get(`/api/campaigns/${id}/recon-run`);
 export const getCampaignFindings = (id, params) => api.get(`/api/campaigns/${id}/findings`, { params });
 export const getCampaignCoverage = (id) => api.get(`/api/campaigns/${id}/coverage`);
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,6 +129,14 @@ export const getUserProfile = () => api.get('/api/auth/me');
 export const createCheckoutSession = (payload) => api.post('/api/billing/checkout', payload);
 export const getBillingPlans = () => api.get('/api/billing/plans');
 export const createCustomerPortalSession = () => api.post('/api/billing/portal');
+export const getWorkspaces = () => api.get('/api/organizations');
+export const createWorkspace = (payload) => api.post('/api/organizations', payload);
+export const getWorkspaceMembers = (id) => api.get(`/api/organizations/${id}/members`);
+export const addWorkspaceMember = (id, payload) => api.post(`/api/organizations/${id}/members`, payload);
+export const updateWorkspaceMember = (id, userId, payload) =>
+  api.patch(`/api/organizations/${id}/members/${userId}`, payload);
+export const removeWorkspaceMember = (id, userId) =>
+  api.delete(`/api/organizations/${id}/members/${userId}`);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 21 & 22: Controlled & Real-World Validation
@@ -191,5 +200,3 @@ export const postCampaignReconLiveValidation = (id, mode, payload) =>
 
 export { api };
 export default api;
-
-

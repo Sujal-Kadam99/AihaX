@@ -7,7 +7,9 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build:frontend": "cd ../frontend && npm install && npm run build",
-    "build": "npm run build:frontend && electron-builder --win",
+    "build": "npm run build:frontend && electron-builder --win --config electron-builder.config.js",
+    "build:release": "node scripts/build-release.js",
+    "test:update": "node --test test/update-policy.test.js",
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
@@ -59,7 +61,10 @@
     }
   },
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "electron": "^28.3.3",

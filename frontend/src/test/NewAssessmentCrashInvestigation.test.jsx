@@ -409,6 +409,28 @@ describe('NewAssessment Crash Investigation & Resilience Suite', () => {
       expect(profileSelect.value).toBe('FULL_AUTHORIZED_SCAN');
     });
 
+    it('offers a bounded Recon-Only launch without showing a placeholder authorization reference', async () => {
+      render(
+        <ToastProvider>
+          <NewAssessment />
+        </ToastProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: /mit2\+/i })).toBeDefined();
+      });
+
+      const reference = screen.getByLabelText(/Ticket \/ Contract Reference/i);
+      expect(reference.value).toBe('');
+
+      const profileSelect = screen.getByLabelText(/Scan Profile/i);
+      fireEvent.change(profileSelect, { target: { value: 'RECON_ONLY' } });
+
+      expect(screen.getByRole('button', { name: /Launch Recon-Only Campaign/i })).toBeDefined();
+      expect(screen.getByText(/100 Max Requests/i)).toBeDefined();
+      expect(screen.getByText(/Vulnerability checks are not launched/i)).toBeDefined();
+    });
+
     it('handles custom budget and concurrency numeric input changes', async () => {
       render(
         <ToastProvider>
