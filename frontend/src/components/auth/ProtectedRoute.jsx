@@ -8,7 +8,7 @@ export default function ProtectedRoute({ children }) {
   const { isAuthenticated, authState } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(true);
 
-  if (authState === AUTH_STATES.UNKNOWN || authState === AUTH_STATES.AUTHENTICATING) {
+  if ([AUTH_STATES.UNKNOWN, AUTH_STATES.AUTHENTICATING, AUTH_STATES.REFRESHING].includes(authState)) {
     return (
       <div className="p-8 max-w-4xl mx-auto space-y-4">
         <Skeleton className="h-10 w-1/3" />

@@ -10,7 +10,7 @@ export default function UsageMeter({ used, limit = 3 }) {
   const isAtLimit = used >= limit;
 
   return (
-    <Card className={`border ${isAtLimit ? 'border-destructive' : isNearLimit ? 'border-warning' : 'border-border-subtle'} bg-surface-1`}>
+    <Card className={`border ${isAtLimit ? 'border-destructive' : isNearLimit ? 'border-warning' : 'border-border-subtle'} bg-surface`}>
       <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex-1 w-full">
           <div className="flex items-center justify-between mb-2">

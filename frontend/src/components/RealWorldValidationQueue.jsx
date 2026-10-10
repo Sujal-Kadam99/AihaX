@@ -13,8 +13,10 @@ import {
   approveRealVerification,
   executeRealVerification,
 } from '../lib/api';
+import { useToast } from '../hooks/useToast';
 
 export default function RealWorldValidationQueue({ campaignId, targetUrl, onVerificationComplete }) {
+  const { addToast } = useToast();
   const [hypotheses, setHypotheses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -61,7 +63,7 @@ export default function RealWorldValidationQueue({ campaignId, targetUrl, onVeri
       setConfirmedLiveDispatch(false);
       setExecutionResult(null);
     } catch (err) {
-      alert(`Approval error: ${err.response?.data?.detail || err.message}`);
+      addToast({ title: 'Approval error', message: err.response?.data?.detail || err.message, variant: 'error' });
     }
   };
 
@@ -77,7 +79,7 @@ export default function RealWorldValidationQueue({ campaignId, targetUrl, onVeri
       setShowRejectModal(false);
       setRejectionReason('');
     } catch (err) {
-      alert(`Error logging decision: ${err.response?.data?.detail || err.message}`);
+      addToast({ title: 'Decision error', message: err.response?.data?.detail || err.message, variant: 'error' });
     }
   };
 
@@ -110,7 +112,7 @@ export default function RealWorldValidationQueue({ campaignId, targetUrl, onVeri
       }
     } catch (err) {
       console.error('Live execution error:', err);
-      alert(`Verification failed: ${err.response?.data?.detail || err.message}`);
+      addToast({ title: 'Verification failed', message: err.response?.data?.detail || err.message, variant: 'error' });
     } finally {
       setExecuting(false);
     }

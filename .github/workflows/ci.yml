@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked --project backend --group dev
+      - run: uv run --locked --project backend pytest backend/tests/test_auth.py backend/tests/test_backend.py backend/tests/test_campaign_scope.py
+      - name: Run legacy backend suite (baseline reporting)
+        continue-on-error: true
+        run: uv run --locked --project backend pytest backend/tests --ignore=backend/tests/test_phase27_recon_tool_provisioning.py
+      - name: Check changed Python files for syntax and undefined names
+        if: github.event_name == 'pull_request'
+        run: |
+          files="$(git diff --name-only '${{ github.event.pull_request.base.sha }}'...HEAD -- 'backend/**/*.py')"
+          if [ -n "$files" ]; then printf '%s\n' "$files" | xargs uv run --locked --project backend ruff check --select E999,F821; fi
+      - name: Run whole-backend type check (baseline reporting)
+        continue-on-error: true
+        run: uv run --locked --project backend mypy backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --audit-level=critical
+
+  electron:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high

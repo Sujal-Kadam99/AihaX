@@ -8,8 +8,10 @@ import {
   Activity,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { useToast } from '../hooks/useToast';
 
 export default function ValidationQueue({ campaignId, targetUrl, onVerificationComplete }) {
+  const { addToast } = useToast();
   const [hypotheses, setHypotheses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,7 +68,7 @@ export default function ValidationQueue({ campaignId, targetUrl, onVerificationC
         }
       }
     } catch (err) {
-      alert(`Decision error: ${err.response?.data?.detail || err.message}`);
+      addToast({ title: 'Decision error', message: err.response?.data?.detail || err.message, variant: 'error' });
     }
   };
 
@@ -86,7 +88,7 @@ export default function ValidationQueue({ campaignId, targetUrl, onVerificationC
         }
       }
     } catch (err) {
-      alert(`Execution failed: ${err.response?.data?.detail || err.message}`);
+      addToast({ title: 'Execution failed', message: err.response?.data?.detail || err.message, variant: 'error' });
     } finally {
       setExecuting(false);
     }

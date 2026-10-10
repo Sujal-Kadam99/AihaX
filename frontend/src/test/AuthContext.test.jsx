@@ -1,11 +1,23 @@
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AuthProvider, AUTH_STATES } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 
+const { mockGetEntitlements, mockGoogleLogin, mockRefreshSession, mockLogoutSession } = vi.hoisted(() => ({
+  mockGetEntitlements: vi.fn(),
+  mockGoogleLogin: vi.fn(),
+  mockRefreshSession: vi.fn(),
+  mockLogoutSession: vi.fn(),
+}));
+
 vi.mock('../lib/api', () => ({
-  getEntitlements: vi.fn().mockResolvedValue({ data: { tier: 'pro' } }),
+  getEntitlements: mockGetEntitlements,
+  loginWithGoogle: mockGoogleLogin,
+  refreshSession: mockRefreshSession,
+  logoutSession: mockLogoutSession,
+  setApiSession: vi.fn(),
+  setApiSessionCallbacks: vi.fn(),
 }));
 
 const localStorageMock = (() => {
@@ -47,17 +59,22 @@ const TestComponent = () => {
 describe('AuthContext & ProtectedRoute Security Tests', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    mockGetEntitlements.mockReset().mockResolvedValue({ data: { tier: 'pro' } });
+    mockGoogleLogin.mockReset();
+    mockRefreshSession.mockReset();
+    mockLogoutSession.mockReset();
+    delete window.aihax;
     window.localStorage.clear();
   });
 
-  it('initializes to LOGGED_OUT state without exposing tokens in localStorage', () => {
+  it('initializes to LOGGED_OUT state without exposing tokens in localStorage', async () => {
     render(
       <AuthProvider>
         <TestComponent />
       </AuthProvider>
     );
 
-    expect(screen.getByTestId('auth-state').textContent).toBe(AUTH_STATES.LOGGED_OUT);
+    await waitFor(() => expect(screen.getByTestId('auth-state').textContent).toBe(AUTH_STATES.LOGGED_OUT));
     expect(screen.getByTestId('is-authenticated').textContent).toBe('NO');
     expect(screen.getByTestId('user-email').textContent).toBe('NONE');
 
@@ -68,9 +85,8 @@ describe('AuthContext & ProtectedRoute Security Tests', () => {
   });
 
   it('updates state to AUTHENTICATED on login while keeping tokens out of localStorage', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    mockGoogleLogin.mockResolvedValue({
+      data: {
         access_token: 'mock_jwt_access_token_123',
         refresh_token: 'mock_refresh_token_456',
         user: {
@@ -79,8 +95,8 @@ describe('AuthContext & ProtectedRoute Security Tests', () => {
           email: 'test_user@example.com',
           name: 'Test User',
         },
-      }),
-    }));
+      },
+    });
 
     render(
       <AuthProvider>
@@ -101,7 +117,28 @@ describe('AuthContext & ProtectedRoute Security Tests', () => {
     expect(window.localStorage.getItem('refresh_token')).toBeNull();
   });
 
-  it('ProtectedRoute blocks unauthenticated access and renders login prompt', () => {
+  it('restores a session by rotating the OS-stored refresh token', async () => {
+    window.aihax = { getRefreshToken: vi.fn().mockResolvedValue('stored-refresh-token') };
+    mockRefreshSession.mockResolvedValue({
+      data: {
+        access_token: 'restored-access-token',
+        refresh_token: 'rotated-refresh-token',
+        user: { email: 'restored@example.com' },
+      },
+    });
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    );
+
+    expect(await screen.findByText('YES')).toBeDefined();
+    expect(mockRefreshSession).toHaveBeenCalledWith('stored-refresh-token');
+    expect(screen.getByTestId('user-email').textContent).toBe('restored@example.com');
+  });
+
+  it('ProtectedRoute blocks unauthenticated access and renders login prompt', async () => {
     render(
       <AuthProvider>
         <ProtectedRoute>
@@ -111,6 +148,6 @@ describe('AuthContext & ProtectedRoute Security Tests', () => {
     );
 
     expect(screen.queryByTestId('protected-content')).toBeNull();
-    expect(screen.getByText('Authentication Required')).toBeDefined();
+    expect(await screen.findByText('Authentication Required')).toBeDefined();
   });
 });
