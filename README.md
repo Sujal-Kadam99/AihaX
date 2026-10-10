@@ -26,6 +26,8 @@ Electron desktop shell (optional)
         └── Optional security tools and external integrations
 ```
 
+The detailed product and architecture decisions are maintained in [the decisions log](docs/DECISIONS.md). This README is the current setup and capability reference; older status snapshots are not authoritative.
+
 The development Docker Compose stack runs the backend, Redis, and frontend. SQLite, reports, and configuration are mounted from host directories. ChromaDB is an optional backend capability, not a required service in the Compose stack.
 
 ## Requirements
@@ -66,11 +68,12 @@ Use the assessment UI to select an authorized program, enter a concrete target, 
 
 ## Development
 
-Backend dependencies are listed in `backend/requirements.txt`; frontend and Electron scripts are in their respective `package.json` files.
+Backend dependency constraints remain in `backend/requirements.txt`; reproducible backend installs use `backend/pyproject.toml` and its lockfile. Frontend and Electron scripts are in their respective `package.json` files.
+For a reproducible Python 3.11+ backend environment, install [uv](https://docs.astral.sh/uv/) and run `uv sync --locked --project backend --group dev`. The checked-in `backend/uv.lock` pins runtime and development dependencies.
 
 ```powershell
 # Backend tests
-python -m pytest backend/tests
+uv run --locked --project backend pytest backend/tests
 
 # Frontend tests and production build
 cd frontend
@@ -94,6 +97,8 @@ The repository also includes Ruff configuration in `pyproject.toml`. Some integr
 - The Compose backend is bound to loopback. Review authentication, CORS, trusted-host, secret, persistence, and network settings before deploying beyond local development.
 
 ## Documentation
+
+See the [documentation index](docs/README.md) for architecture, security, operations, verification, and phase artifacts.
 
 - [Live reconnaissance execution and preflight](docs/recon_live_execution.md)
 - [Reconnaissance architecture and scope safety](docs/recon_architecture.md), [scope safety](docs/recon_scope_safety.md)

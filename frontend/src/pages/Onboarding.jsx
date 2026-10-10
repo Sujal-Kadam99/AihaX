@@ -32,7 +32,7 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-bg-app flex items-center justify-center p-6">
-      <div className="max-w-xl w-full bg-surface-1 border border-border-subtle rounded-xl p-8 shadow-2xl relative overflow-hidden">
+      <div className="max-w-xl w-full bg-surface border border-border-subtle rounded-xl p-8 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-accent via-accent-hover to-accent" />
         
         {step === 1 && (

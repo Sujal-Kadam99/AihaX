@@ -223,7 +223,7 @@ export default function NewScan() {
                       {...register('in_scope_assets')}
                       rows={3}
                       placeholder="*.example.com&#10;api.example.com&#10;https://example.com/v1/*"
-                      className="w-full bg-surface-1 border border-border-subtle rounded-lg text-text-primary text-xs font-mono p-3 focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="w-full bg-surface border border-border-subtle rounded-lg text-text-primary text-xs font-mono p-3 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                     <span className="text-[11px] text-text-muted">Wildcards (*.domain.com) and URL prefixes supported</span>
                   </div>
@@ -236,7 +236,7 @@ export default function NewScan() {
                       {...register('out_of_scope_assets')}
                       rows={3}
                       placeholder="admin.example.com&#10;billing.example.com&#10;/internal/*"
-                      className="w-full bg-surface-1 border border-border-subtle rounded-lg text-text-primary text-xs font-mono p-3 focus:outline-none focus:ring-2 focus:ring-critical"
+                      className="w-full bg-surface border border-border-subtle rounded-lg text-text-primary text-xs font-mono p-3 focus:outline-none focus:ring-2 focus:ring-critical"
                     />
                     <span className="text-[11px] text-text-muted">Explicit exclusions always override inclusions</span>
                   </div>
@@ -255,7 +255,7 @@ export default function NewScan() {
                     className={`text-left p-4 rounded-xl border transition-all ${
                       selectedMode === mode.id
                         ? 'border-accent bg-accent/10 ring-1 ring-accent'
-                        : 'border-border-subtle bg-surface-1 hover:border-border-strong hover:bg-surface-2'
+                        : 'border-border-subtle bg-surface hover:border-border-strong hover:bg-surface-2'
                     }`}
                   >
                     <p className="font-semibold text-text-primary text-sm">{mode.label}</p>
@@ -398,7 +398,7 @@ export default function NewScan() {
                     {...register('scope_notes')}
                     rows={4}
                     placeholder="Enter bug bounty program policy URL, HackerOne/Bugcrowd program handle, or written engagement details..."
-                    className="w-full bg-surface-1 border border-border-strong rounded-lg text-text-primary text-sm p-4 focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full bg-surface border border-border-strong rounded-lg text-text-primary text-sm p-4 focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                   <p className="text-xs text-text-muted">Recorded in the audit trail and report metadata.</p>
                 </div>

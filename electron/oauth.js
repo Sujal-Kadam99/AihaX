@@ -28,6 +28,7 @@ function startDesktopOAuthFlow(googleClientId) {
 
     const { codeVerifier, codeChallenge, state } = generatePKCE();
     let server = null;
+    let callbackRedirectUri = null;
     let isHandled = false;
 
     const cleanup = () => {
@@ -99,6 +100,8 @@ function startDesktopOAuthFlow(googleClientId) {
           return;
         }
 
+        const redirectUri = callbackRedirectUri;
+
         // Return HTML response to browser
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(
@@ -116,9 +119,6 @@ function startDesktopOAuthFlow(googleClientId) {
           cleanup();
 
           // Exchange authorization code for Google ID token using PKCE verifier
-          const port = server ? server.address().port : 0;
-          const redirectUri = `http://127.0.0.1:${port}/callback`;
-
           const tokenResp = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({
             code,
             client_id: googleClientId,
@@ -150,12 +150,20 @@ function startDesktopOAuthFlow(googleClientId) {
     server.listen(0, '127.0.0.1', () => {
       const port = server.address().port;
       const redirectUri = `http://127.0.0.1:${port}/callback`;
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&response_type=code&scope=openid%20email%20profile&code_challenge=${codeChallenge}&code_challenge_method=S256&state=${state}`;
+      callbackRedirectUri = redirectUri;
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.search = new URLSearchParams({
+        client_id: googleClientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        state,
+      }).toString();
 
       // Open in system default web browser (Never an embedded webview!)
-      shell.openExternal(authUrl).catch((err) => {
+      shell.openExternal(authUrl.toString()).catch((err) => {
         if (!isHandled) {
           isHandled = true;
           clearTimeout(timeoutTimer);

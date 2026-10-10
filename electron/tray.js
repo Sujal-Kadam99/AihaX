@@ -67,9 +67,6 @@ function createTray(mainWindow) {
 
 function updateTrayStatus(status, message) {
     if (!tray) return;
-    const contextMenu = tray.ContextMenu || tray.contextMenu;
-    if (!contextMenu) return; // Note: Menu state updating dynamically in Electron requires rebuilding or using getMenuItemById if built properly.
-    
     // To properly update, we'll re-build the menu just updating the status text
     const newMenu = Menu.buildFromTemplate([
         {

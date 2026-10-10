@@ -11,7 +11,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from backend.core.auth import require_auth
+from backend.core.auth import _is_public_path, require_auth
+from backend.core.rate_limit import check_rate_limit
 from backend.core.config import ensure_directories, get_settings
 from backend.core.errors import APIException
 from backend.core.logger import setup_logger
@@ -77,9 +78,6 @@ async def auth_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
     try:
-        from backend.core.auth import _is_public_path
-        from backend.core.rate_limit import check_rate_limit
-
         if _is_public_path(request.url.path):
             check_rate_limit(request, "public")
         else:
