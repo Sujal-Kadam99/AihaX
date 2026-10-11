@@ -24,7 +24,12 @@ from sqlalchemy.orm import Session
 
 import backend.agents.checks  # Ensure all 77 checks are registered
 from backend.core.check_registry import registry
-from backend.core.scope_validator import ScopeValidator, normalize_url, validate_concrete_target_url, validate_destination_safety
+from backend.core.scope_validator import (
+    ScopeValidator,
+    normalize_url,
+    validate_concrete_target_url,
+    validate_destination_safety,
+)
 from backend.evidence.evidence_manifest import (
     CampaignIntegrityReport,
     CampaignManifest,
@@ -286,29 +291,6 @@ class CampaignOperationsService:
             event_type="TARGET_BOUND",
             actor=req.actor,
             metadata={"target_url": normalized_target, "notes": req.notes},
-        )
-        self.repo.session.flush()
-        return campaign
-
-    def kill_campaign(self, campaign_id: str, actor: str = "operator", reason: str = "Emergency kill switch triggered") -> Campaign:
-        """Emergency kill switch: Immediately halts campaign and cancels running tasks."""
-        campaign = self.repo.get_campaign(campaign_id)
-        if not campaign:
-            raise ValueError(f"Campaign '{campaign_id}' not found.")
-
-        # Cancel tasks
-        tasks = self.repo.get_tasks(campaign_id)
-        for t in tasks:
-            if t.status in ("RUNNING", "PENDING", "CLAIMED"):
-                t.status = "CANCELLED"
-                t.failure_reason = f"Killed by operator: {reason}"
-
-        campaign.status = "KILLED"
-        self.repo.append_audit_event(
-            campaign_id=campaign.id,
-            event_type="CAMPAIGN_KILLED",
-            actor=actor,
-            metadata={"reason": reason},
         )
         self.repo.session.flush()
         return campaign
