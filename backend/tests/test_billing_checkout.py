@@ -6,8 +6,8 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import pytest
 import jwt
+import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
@@ -428,6 +428,8 @@ def test_stripe_subscription_migration_upgrades_existing_database():
                 )
             )
             connection.execute(text("CREATE TABLE campaigns (id VARCHAR PRIMARY KEY)"))
+            # Migration 30 alters watch_schedules; a pre-v30 database already has it.
+            connection.execute(text("CREATE TABLE watch_schedules (id VARCHAR PRIMARY KEY)"))
             for migration in MIGRATIONS:
                 if migration["version"] == 30:
                     break
@@ -464,6 +466,9 @@ def test_stripe_subscription_migration_upgrades_existing_database():
             campaign_columns = {
                 row[1] for row in connection.execute(text("PRAGMA table_info('campaigns')"))
             }
+            watch_schedule_columns = {
+                row[1] for row in connection.execute(text("PRAGMA table_info('watch_schedules')"))
+            }
             applied_version = connection.execute(
                 text("SELECT MAX(version) FROM schema_migrations")
             ).scalar_one()
@@ -474,9 +479,10 @@ def test_stripe_subscription_migration_upgrades_existing_database():
             "stripe_checkout_session_id",
         } <= columns
         assert event_table == "stripe_webhook_events"
-        assert applied_version == 31
+        assert applied_version == MIGRATIONS[-1]["version"]
         assert organization_table == "organizations"
         assert "organization_id" in campaign_columns
+        assert "user_id" in watch_schedule_columns
     finally:
         engine.dispose()
 
