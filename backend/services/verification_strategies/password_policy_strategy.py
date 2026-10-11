@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import secrets
+
+from backend.services.request_engine import RequestSpec, RequestTimeout
 from backend.services.verification_engine import (
     BaseVerificationStrategy,
     VerificationConclusion,
@@ -13,7 +15,6 @@ from backend.services.verification_engine import (
     VerificationRegistry,
     VerificationStatus,
 )
-from backend.services.request_engine import RequestSpec, RequestTimeout
 
 
 class PasswordPolicyVerificationStrategy(BaseVerificationStrategy):

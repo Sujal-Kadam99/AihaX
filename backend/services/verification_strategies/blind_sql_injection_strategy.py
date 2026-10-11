@@ -1,16 +1,18 @@
 import time
+from datetime import datetime, timezone
 from typing import Optional
+
+from backend.services.request_engine import RequestEvidence, RequestSpec
 from backend.services.verification_engine import (
     BaseVerificationStrategy,
-    VerificationContract,
     VerificationConclusion,
     VerificationContext,
-    VerificationStatus,
+    VerificationContract,
     VerificationReasonCode,
+    VerificationStatus,
 )
-from datetime import datetime, timezone
-from backend.services.request_engine import RequestSpec, RequestEvidence
 from backend.services.verification_strategies.request_builder import build_injected_request
+
 
 class BlindSqlInjectionVerificationStrategy(BaseVerificationStrategy):
     contract = VerificationContract(

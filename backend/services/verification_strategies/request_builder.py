@@ -1,7 +1,9 @@
-import urllib.parse
 import json
+import urllib.parse
 from typing import Optional
+
 from backend.services.request_engine import RequestSpec
+
 
 def build_injected_request(candidate: dict, new_payload: str) -> Optional[RequestSpec]:
     affected_url = candidate.get("affected_url")

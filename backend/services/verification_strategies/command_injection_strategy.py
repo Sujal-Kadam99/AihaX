@@ -1,14 +1,16 @@
 import re
+
+from backend.services.request_engine import RequestSpec
 from backend.services.verification_engine import (
     BaseVerificationStrategy,
-    VerificationContract,
     VerificationConclusion,
     VerificationContext,
-    VerificationStatus,
+    VerificationContract,
     VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.request_engine import RequestSpec
 from backend.services.verification_strategies.request_builder import build_injected_request
+
 
 class CommandInjectionVerificationStrategy(BaseVerificationStrategy):
     contract = VerificationContract(
