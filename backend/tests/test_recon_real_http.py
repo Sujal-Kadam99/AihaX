@@ -5,6 +5,8 @@ Tests real-world reconnaissance pipelines against the live Security Lab server.
 
 from __future__ import annotations
 
+import socket
+
 import pytest
 from aiohttp import web
 
@@ -20,8 +22,6 @@ from backend.recon.models import DiscoveredAsset, DiscoverySource
 from backend.services.request_engine import AiohttpTransport, RequestEngine
 from backend.tests.fixtures.security_lab.lab_server import create_security_lab_app
 
-
-import socket
 
 @pytest.fixture
 def free_port() -> int:
@@ -132,7 +132,7 @@ async def test_real_http_endpoint_discovery_robots_sitemap_and_html(live_securit
     assert any("/graphql" in p for p in paths)
 
     # 5. OpenAPI route extraction
-    assert any("/api/v1/accounts/{id}" in p for p in paths or "/api/upload" in p for p in paths)
+    assert any("/api/v1/accounts/{id}" in p for p in paths) or any("/api/upload" in p for p in paths)
 
 
 @pytest.mark.asyncio
