@@ -299,12 +299,8 @@ class XssVerificationStrategy(BaseVerificationStrategy):
             )
 
         # Debug logging for reflected XSS
-        logger.info(f"[XSS_STRATEGY DEBUG] injected_req.url: {injected_req.url}")
-        logger.info(f"[XSS_STRATEGY DEBUG] cookies: {cookies}")
-        logger.info(f"[XSS_STRATEGY DEBUG] context.auth_context: {context.auth_context}")
-        print(f"[XSS_STRATEGY DEBUG] injected_req.url: {injected_req.url}", flush=True)
-        print(f"[XSS_STRATEGY DEBUG] cookies: {cookies}", flush=True)
-        print(f"[XSS_STRATEGY DEBUG] context.auth_context: {context.auth_context}", flush=True)
+        logger.debug(f"[XSS_STRATEGY] injected_req.url: {injected_req.url}")
+        logger.debug(f"[XSS_STRATEGY] cookie_names: {sorted(cookies) if isinstance(cookies, dict) else None}")
 
         # Browser validation phase
         custom_runner = candidate.get("browser_runner")

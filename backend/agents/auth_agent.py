@@ -873,7 +873,10 @@ class AuthAgent(BaseAgent):
             or self.config.get("primary_credentials")
             or self.config.get("account_1_creds")
         )
-        logger.info(f"[AUTH_AGENT EXECUTE] primary_creds resolved to: {primary_creds}")
+        logger.info(
+            f"[AUTH_AGENT EXECUTE] primary_creds resolved: {bool(primary_creds)}, "
+            f"fields={sorted(primary_creds) if isinstance(primary_creds, dict) else None}"
+        )
         secondary_creds = (
             self.config.get("secondary_creds")
             or self.config.get("secondary_credentials")
