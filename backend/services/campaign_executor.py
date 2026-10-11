@@ -19,19 +19,20 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 from urllib.parse import urlparse
 
+import backend.agents.checks  # Ensure all 77 checks are loaded in registry
 from backend.core.check_registry import (
     BaseCheck,
     CheckContract,
     CheckResult,
     registry,
 )
-import backend.agents.checks  # Ensure all 77 checks are loaded in registry
 from backend.core.scope_validator import (
     ScopeDecision,
     ScopeStatus,

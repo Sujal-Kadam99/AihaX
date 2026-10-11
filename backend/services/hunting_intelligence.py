@@ -15,12 +15,15 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Set
+
 from sqlalchemy.orm import Session
 
 from backend.core.check_registry import (
     CheckCategory,
     CheckContract,
     CheckRiskLevel,
+)
+from backend.core.check_registry import (
     registry as default_registry,
 )
 from backend.services.assessment_memory import AssessmentMemoryService

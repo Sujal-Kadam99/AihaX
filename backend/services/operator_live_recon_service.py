@@ -17,18 +17,18 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from sqlalchemy.orm import Session
+
 from sqlalchemy import update
+from sqlalchemy.orm import Session
 
 from backend.core.errors import NotFoundException
 from backend.core.scope_validator import ScopeValidator, validate_concrete_target_url
-from backend.persistence.models import AuthorizationRecord, AuditTrailEvent, Campaign
+from backend.persistence.models import AuditTrailEvent, AuthorizationRecord, Campaign
 from backend.persistence.repository import CampaignRepository
 from backend.recon.recon_modes import ReconContext, ReconExecutionMode
-from backend.recon.recon_preflight import ReconPreflightGate, PreflightStatus
+from backend.recon.recon_preflight import PreflightStatus, ReconPreflightGate
 from backend.recon.recon_tool_availability import ReconToolAvailability
 from backend.services.request_engine import RequestEngine
-
 
 TOOL_CAPABILITY_MAP: Dict[str, Dict[str, Any]] = {
     "subfinder": {
@@ -351,7 +351,10 @@ class OperatorLiveReconService:
         db.commit()
 
         if mode == "live":
-            from backend.recon.live_recon_validator import LiveReconValidationEngine, ExecutionOrigin
+            from backend.recon.live_recon_validator import (
+                ExecutionOrigin,
+                LiveReconValidationEngine,
+            )
             authorized_scope = ScopeValidator(
                 in_scope_assets=preflight["scope"]["in_scope_rules"],
                 out_of_scope_assets=preflight["scope"]["out_of_scope_rules"],

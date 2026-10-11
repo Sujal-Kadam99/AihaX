@@ -186,7 +186,7 @@ class RealEvidenceCorrelator:
 
         elif "IDOR" in vuln_type or "BOLA" in vuln_type:
             if base_status in [401, 403, 404] and verif_status == 200:
-                return "CONFIRMED", f"IDOR/BOLA confirmed: unauthorized identifier request succeeded with HTTP 200."
+                return "CONFIRMED", "IDOR/BOLA confirmed: unauthorized identifier request succeeded with HTTP 200."
             if verif_status in [401, 403]:
                 return "NOT_CONFIRMED", f"Object-level authorization enforced: server returned HTTP {verif_status}."
             if comp_verdict == "SECURITY_RELEVANT_DIFFERENCE" and verif_status == 200:

@@ -15,6 +15,7 @@ import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
+
 from sqlalchemy.orm import Session
 
 from backend.models.database import CheckEffectivenessRecord, get_utc_now

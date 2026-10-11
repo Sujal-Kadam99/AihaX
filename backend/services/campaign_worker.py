@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from sqlalchemy.orm import Session
 
+import backend.agents.checks  # Ensure checks are registered
 from backend.core.check_registry import (
     BaseCheck,
     CheckContract,
@@ -36,13 +37,20 @@ from backend.core.check_registry import (
     Severity,
     registry,
 )
-import backend.agents.checks  # Ensure checks are registered
 from backend.core.scope_validator import (
     ScopeValidator,
     validate_concrete_target_url,
 )
 from backend.evidence.evidence_store import EvidenceVault
-from backend.models.database import Finding, FindingDisposition, BountyEligibility, Program, ProgramScope, Scan, get_session_factory
+from backend.models.database import (
+    BountyEligibility,
+    Finding,
+    FindingDisposition,
+    Program,
+    ProgramScope,
+    Scan,
+    get_session_factory,
+)
 from backend.persistence.models import Campaign, ExecutionTask
 from backend.persistence.repository import CampaignRepository
 from backend.persistence.state_machine import (
@@ -50,12 +58,12 @@ from backend.persistence.state_machine import (
     InvalidStateTransitionError,
     TaskLifecycleState,
 )
+from backend.services.automated_finding_verifier import AutomatedFindingVerifier
 from backend.services.finding_deduplicator import (
     ConfidenceLevel,
     DeterministicConfidenceScorer,
     FindingLifecycleState,
 )
-from backend.services.automated_finding_verifier import AutomatedFindingVerifier
 from backend.services.request_engine import (
     AuthenticationContext,
     BaseAsyncTransport,
