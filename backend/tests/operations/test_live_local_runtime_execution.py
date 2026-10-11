@@ -41,9 +41,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import backend.agents.checks  # Load all registered checks
 from backend.core.auth import get_or_create_api_token
 from backend.core.check_registry import registry
-import backend.agents.checks  # Load all registered checks
 from backend.core.scope_validator import (
     ScopeDecision,
     ScopeStatus,
@@ -459,8 +459,8 @@ async def test_11_request_accounting_increments(local_lab_server, db_session):
 @pytest.mark.asyncio
 async def test_12_evidence_persisted_in_vault_with_sanitization(local_lab_server, db_session):
     """12. EvidenceRecord persisted in database with SHA-256 hash and secret redaction."""
-    from backend.evidence.redaction import redact_secrets
     from backend.evidence.integrity import compute_evidence_content_hash
+    from backend.evidence.redaction import redact_secrets
 
     repo = CampaignRepository(db_session)
     service = CampaignOperationsService(repo)
