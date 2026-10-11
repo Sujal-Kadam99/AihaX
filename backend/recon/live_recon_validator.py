@@ -30,17 +30,21 @@ import asyncio
 import hashlib
 import json
 import logging
-from pathlib import Path
 import re
 import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
-from backend.core.scope_validator import ScopeValidator, normalize_domain, validate_destination_safety
+from backend.core.scope_validator import (
+    ScopeValidator,
+    normalize_domain,
+    validate_destination_safety,
+)
 from backend.execution.tool_execution_boundary import (
     ALLOWED_TOOLS,
     ExecutionProfile,
@@ -51,9 +55,9 @@ from backend.execution.tool_execution_boundary import (
     ToolExecutionStatus,
 )
 from backend.models.database import get_utc_now
+from backend.recon.endpoint_discovery import EndpointDiscoveryEngine
 from backend.recon.http_probe import HttpProbeEngine
 from backend.recon.models import AssetType, DiscoveredAsset, DiscoverySource
-from backend.recon.endpoint_discovery import EndpointDiscoveryEngine
 from backend.recon.recon_modes import (
     NormalizedReconAsset,
     ProviderStatus,
@@ -62,13 +66,13 @@ from backend.recon.recon_modes import (
     ReconContext,
     ReconExecutionMode,
 )
+from backend.recon.recon_tool_availability import ReconToolAvailability
 from backend.recon.snapshot import CanonicalReconSnapshot
 from backend.services.attack_surface_graph import (
     AttackSurfaceEdgeType,
     AttackSurfaceGraphEngine,
     AttackSurfaceNodeType,
 )
-from backend.services.request_engine import RequestEngine
 from backend.services.discovery.crtsh_provider import CRTShProvider
 from backend.services.discovery.normalizer import normalize_domain as rfc_normalize_domain
 from backend.services.discovery.normalizer import normalize_url
@@ -79,8 +83,6 @@ from backend.services.request_engine import (
     RequestSpec,
     RequestTimeout,
 )
-
-from backend.recon.recon_tool_availability import ReconToolAvailability
 
 logger = logging.getLogger("aihax.live_recon_validator")
 
@@ -1568,7 +1570,7 @@ class LiveReconValidationEngine:
                         "asset": f"{base_domain}:{rtype}:{val.strip().lower()}",
                         "type": "ip_address" if rtype in ("A", "AAAA") else "dns_record",
                         "authorization_status": "DISCOVERED_NOT_AUTHORIZED",
-                        "evidence_hash": hashlib.sha256(f"{rtype}:{val}".encode("utf-8")).hexdigest(),
+                        "evidence_hash": hashlib.sha256(f"{rtype}:{val}".encode()).hexdigest(),
                     })
 
             rec.raw_output = json.dumps(resolved)
@@ -1661,7 +1663,7 @@ class LiveReconValidationEngine:
                 "status_code": probe_res.status_code,
                 "server": probe_res.server_banner,
                 "title": probe_res.title,
-                "evidence_hash": hashlib.sha256(f"{probe_res.status_code}:{probe_res.title}".encode("utf-8")).hexdigest(),
+                "evidence_hash": hashlib.sha256(f"{probe_res.status_code}:{probe_res.title}".encode()).hexdigest(),
             }]
 
             rec.raw_output = json.dumps({

@@ -10,7 +10,12 @@ from urllib.parse import urljoin, urlparse
 
 from backend.core.scope_validator import ScopeValidator
 from backend.recon.models import DiscoveredAsset, HttpProbeResult
-from backend.services.request_engine import BaseAsyncTransport, RequestEngine, RequestSpec, RequestTimeout
+from backend.services.request_engine import (
+    BaseAsyncTransport,
+    RequestEngine,
+    RequestSpec,
+    RequestTimeout,
+)
 
 logger = logging.getLogger("backend.recon.http_probe")
 

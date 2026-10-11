@@ -23,7 +23,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
-from backend.core.scope_validator import ScopeValidator, normalize_domain, validate_destination_safety
+from backend.core.scope_validator import (
+    ScopeValidator,
+    normalize_domain,
+    validate_destination_safety,
+)
 from backend.execution.tool_execution_boundary import ToolExecutionBoundary
 from backend.recon.providers import (
     AmassProvider,
@@ -44,7 +48,11 @@ from backend.recon.recon_modes import (
     ReconContext,
     ReconExecutionMode,
 )
-from backend.recon.recon_preflight import PreflightStatus, ReconPreflightDecision, ReconPreflightGate
+from backend.recon.recon_preflight import (
+    PreflightStatus,
+    ReconPreflightDecision,
+    ReconPreflightGate,
+)
 from backend.recon.snapshot import CanonicalReconSnapshot
 from backend.services.attack_surface_graph import (
     AttackSurfaceEdgeType,

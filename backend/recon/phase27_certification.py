@@ -53,9 +53,9 @@ from backend.recon.live_recon_validator import (
 )
 from backend.recon.recon_tool_provisioner import (
     ALLOWED_PROVISIONING_HOSTS,
+    DEFAULT_TOOLS_DIR,
     OFFICIAL_TOOL_PROVENANCE,
     REPO_ROOT,
-    DEFAULT_TOOLS_DIR,
 )
 
 logger = logging.getLogger("aihax.phase27_certification")
@@ -405,7 +405,7 @@ class NetworkSeparationAuditor:
                 rel_path = os.path.relpath(path, REPO_ROOT).replace("\\", "/")
 
                 try:
-                    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(path, encoding="utf-8", errors="ignore") as f:
                         tree = ast.parse(f.read(), filename=path)
                 except Exception as e:
                     findings.append(f"Failed to parse AST for {rel_path}: {e}")

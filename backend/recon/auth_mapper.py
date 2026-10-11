@@ -8,7 +8,12 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from backend.recon.models import AuthRequirement, DiscoveredEndpoint, EndpointType
-from backend.services.request_engine import AuthenticationContext, RequestEngine, RequestSpec, RequestTimeout
+from backend.services.request_engine import (
+    AuthenticationContext,
+    RequestEngine,
+    RequestSpec,
+    RequestTimeout,
+)
 
 logger = logging.getLogger("backend.recon.auth_mapper")
 
