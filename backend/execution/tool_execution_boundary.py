@@ -20,7 +20,6 @@ import hashlib
 import json
 import logging
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -29,6 +28,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
@@ -376,7 +376,7 @@ class ToolExecutionBoundary:
 
         # 5. Validate Destination Safety (Anti-SSRF, RFC1918, Cloud Metadata)
         is_safe, safety_reason = validate_destination_safety(
-            target, 
+            target,
             allow_loopback=request.allow_loopback,
             allowed_ports=set(request.allowed_ports) if request.allowed_ports else None
         )
