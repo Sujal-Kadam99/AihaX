@@ -6,7 +6,7 @@ import sqlite3
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Callable, Optional, Generator, Any
+from typing import Any, Callable, Generator, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -23,9 +23,9 @@ from sqlalchemy import (
     event,
     text,
 )
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.types import TypeDecorator
 
 from backend.core.config import get_settings
