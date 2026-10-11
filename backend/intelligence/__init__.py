@@ -11,15 +11,26 @@ Provides deterministic finding intelligence:
 - CampaignIntelligenceEngine: campaign-level aggregated intelligence
 """
 
-from backend.intelligence.finding_classifier import FindingClassifier, FindingClassification
-from backend.intelligence.severity_engine import SeverityEngine, SeverityAssessment
-from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceAssessment
-from backend.intelligence.evidence_correlator import EvidenceCorrelator, EvidenceChain
-from backend.intelligence.finding_clusterer import FindingClusterer, FindingCluster, ClusterRelationType
-from backend.intelligence.reproducibility import ReproducibilityEngine, ReproductionPackage
+from backend.intelligence.campaign_intelligence import (
+    CampaignIntelligenceEngine,
+    CampaignIntelligenceReport,
+)
+from backend.intelligence.confidence_engine import ConfidenceAssessment, ConfidenceEngine
+from backend.intelligence.evidence_correlator import EvidenceChain, EvidenceCorrelator
+from backend.intelligence.finding_classifier import FindingClassification, FindingClassifier
+from backend.intelligence.finding_clusterer import (
+    ClusterRelationType,
+    FindingCluster,
+    FindingClusterer,
+)
 from backend.intelligence.remediation import RemediationEngine, RemediationGuidance
-from backend.intelligence.campaign_intelligence import CampaignIntelligenceEngine, CampaignIntelligenceReport
-from backend.intelligence.report_guards import ReportGuard, ReportGuardReport, ReportGenerationBlockedError
+from backend.intelligence.report_guards import (
+    ReportGenerationBlockedError,
+    ReportGuard,
+    ReportGuardReport,
+)
+from backend.intelligence.reproducibility import ReproducibilityEngine, ReproductionPackage
+from backend.intelligence.severity_engine import SeverityAssessment, SeverityEngine
 
 __all__ = [
     "FindingClassifier",

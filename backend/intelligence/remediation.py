@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 
 from backend.models.database import Finding
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. REMEDIATION GUIDANCE
 # ──────────────────────────────────────────────────────────────────────────────

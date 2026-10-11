@@ -18,7 +18,6 @@ from typing import Dict, Optional, Set
 
 from backend.models.database import Finding
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. NORMALIZED VULNERABILITY CATEGORIES
 # ──────────────────────────────────────────────────────────────────────────────

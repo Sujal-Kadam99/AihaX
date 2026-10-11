@@ -18,7 +18,6 @@ from typing import Dict, List, Optional
 
 from backend.models.database import Finding
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. SEVERITY ENUM
 # ──────────────────────────────────────────────────────────────────────────────

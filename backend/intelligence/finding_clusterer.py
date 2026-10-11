@@ -22,7 +22,6 @@ from urllib.parse import urlparse
 
 from backend.models.database import Finding
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. CLUSTER RELATION TYPES
 # ──────────────────────────────────────────────────────────────────────────────
