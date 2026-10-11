@@ -5,7 +5,15 @@ import json
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -18,7 +26,20 @@ from backend.core.logger import setup_logger
 from backend.core.redis_client import close_redis, get_redis, subscribe_updates
 from backend.models.database import get_db, init_db
 from backend.models.schemas import HealthResponse
-from backend.routers import auth, billing, campaigns, checks, findings, organizations, programs, reports, scan, settings, watch, ws
+from backend.routers import (
+    auth,
+    billing,
+    campaigns,
+    checks,
+    findings,
+    organizations,
+    programs,
+    reports,
+    scan,
+    settings,
+    watch,
+    ws,
+)
 from backend.services.campaign_worker import campaign_worker_runtime
 from backend.services.watch_scheduler import load_watch_schedules, scheduler
 
