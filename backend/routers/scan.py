@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 
 from backend.agents.base_agent import AGENT_NAMES
 from backend.core.config import get_settings
+from backend.core.entitlements import get_user_tier
 from backend.core.rate_limit import check_scan_rate_limit
 from backend.core.redis_client import get_agent_state, get_scan_status, set_scan_status
-from backend.core.entitlements import get_user_tier
 from backend.models.database import Finding, Scan, get_db
 from backend.models.schemas import (
     AgentStatus,
@@ -90,6 +90,7 @@ async def start_scan(
     # Scope validation if program_id provided
     if config.program_id:
         import json
+
         from backend.core.scope_validator import ScopeValidator
         from backend.models.database import ProgramScope
 

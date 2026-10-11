@@ -8,12 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.core.auth import get_current_user
 from backend.core.config import get_settings
 from backend.core.email import send_smtp_email
+from backend.core.entitlements import EntitlementManager
 from backend.models.database import StripeWebhookEvent, Subscription, User, get_db
 from backend.models.schemas import SubscriptionCreate, SubscriptionResponse
-from backend.core.auth import get_current_user
-from backend.core.entitlements import EntitlementManager
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 

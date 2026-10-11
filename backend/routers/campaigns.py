@@ -31,8 +31,8 @@ from backend.core.errors import (
 from backend.core.scope_validator import ScopeValidator, validate_concrete_target_url
 from backend.models.database import OrganizationMember, Program, get_db
 from backend.models.schemas import ScopeDefinitionSchema
-from backend.persistence.repository import CampaignRepository
 from backend.persistence.models import Campaign
+from backend.persistence.repository import CampaignRepository
 from backend.persistence.state_machine import InvalidStateTransitionError
 from backend.routers.programs import _parse_scope_model_to_schema
 from backend.services.campaign_operations import (
@@ -41,6 +41,7 @@ from backend.services.campaign_operations import (
     ScopeMismatchException,
 )
 from backend.services.metrics_collector import metrics
+
 
 def enforce_campaign_access(
     request: Request,
@@ -673,6 +674,7 @@ def download_campaign_report(
 ):
     """Generate and download a PDF report for a campaign."""
     from fastapi.responses import Response
+
     from backend.services.report_generator import generate_scan_report
 
     repo = CampaignRepository(db)
@@ -885,6 +887,7 @@ def import_program_campaign_route(
     """Import a bug-bounty program with scope definitions without creating executable targets."""
     import uuid
     from datetime import datetime, timezone
+
     from backend.models.database import BugBountyScopeAsset, Program, ProgramScope
 
     program_id = str(uuid.uuid4())
@@ -1202,6 +1205,7 @@ def log_hypothesis_operator_decision(
 ):
     """Log an explicit human operator decision on a hypothesis with SHA-256 audit chaining."""
     import hashlib
+
     from backend.models.database import HypothesisDecisionRecord, get_utc_now
     from backend.persistence.models import Campaign
     from backend.services.vulnerability_hypothesis import VulnerabilityHypothesisEngine
@@ -1516,10 +1520,10 @@ def get_single_real_verification(
 ):
     """Retrieve detailed real verification run record, captured evidence, and impact assessment."""
     from backend.models.database import (
-        RealVerificationRunRecord,
-        RealVerificationEvidenceRecord,
         RealEvidenceChainRecord,
         RealImpactAssessmentRecord,
+        RealVerificationEvidenceRecord,
+        RealVerificationRunRecord,
     )
 
     run = db.query(RealVerificationRunRecord).filter_by(id=run_id, campaign_id=id).first()
@@ -1589,8 +1593,8 @@ def approve_real_verification(
     current_user: Optional[Any] = Depends(get_current_user_optional),
 ):
     """Log an operator approval decision with SHA-256 audit chaining."""
-    from backend.persistence.models import Campaign
     from backend.models.database import VulnerabilityHypothesisRecord
+    from backend.persistence.models import Campaign
     from backend.services.exploit_validator import RealWorldExploitExecutor
 
     campaign = db.query(Campaign).filter(Campaign.id == id).first()
@@ -1650,8 +1654,8 @@ async def execute_real_verification_endpoint(
     current_user: Optional[Any] = Depends(get_current_user_optional),
 ):
     """Execute real HTTP verification against authorized concrete target."""
-    from backend.persistence.models import Campaign
     from backend.models.database import RealOperatorApprovalRecord
+    from backend.persistence.models import Campaign
     from backend.services.exploit_validator import RealWorldExploitExecutor
 
     campaign = db.query(Campaign).filter(Campaign.id == id).first()
@@ -1800,8 +1804,8 @@ def get_attack_surface(
     current_user: Optional[Any] = Depends(get_current_user_optional),
 ):
     """Retrieve attack surface graph nodes, edges, and snapshot hash for a campaign."""
-    from backend.services.attack_surface_graph import AttackSurfaceGraphEngine
     from backend.persistence.models import Campaign
+    from backend.services.attack_surface_graph import AttackSurfaceGraphEngine
 
     campaign = db.query(Campaign).filter_by(id=id).first()
     target_url = campaign.target_url if campaign and campaign.target_url else "https://account.example.com"
@@ -1817,9 +1821,9 @@ def get_correlated_hypotheses(
     current_user: Optional[Any] = Depends(get_current_user_optional),
 ):
     """Generate and retrieve multi-observation correlated hypotheses."""
+    from backend.persistence.models import Campaign
     from backend.services.attack_surface_graph import AttackSurfaceGraphEngine
     from backend.services.vulnerability_hypothesis import VulnerabilityHypothesisEngine
-    from backend.persistence.models import Campaign
 
     campaign = db.query(Campaign).filter_by(id=id).first()
     target_url = campaign.target_url if campaign and campaign.target_url else "https://account.example.com"
