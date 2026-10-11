@@ -19,6 +19,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        AIHAX_UID: ${AIHAX_UID:-10001}
     container_name: aihax-backend
     restart: unless-stopped
     env_file:

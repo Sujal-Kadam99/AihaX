@@ -71,12 +71,22 @@ scratch/test_c*.py
 *.zip
 *.exe
 *.msi
-bin/
 go.zip
 nmap-setup.exe
 nmap.zip
 gopath/
-b
+
+# Local-only AI tooling, downloaded tools, and packaged installers
+/.agents/
+/.gemini/
+/.kilo/
+/bin/
+/downloads/
+/frontend_*.png
+/scan_results.json
+/dvwa_scan_results.json
+/dist-list.txt
+/dist-installers.txt
 
 # Local runtime output and database backups
 /runtime-logs/

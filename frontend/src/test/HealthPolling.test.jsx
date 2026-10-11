@@ -9,6 +9,11 @@ import { BrowserRouter } from 'react-router-dom';
 vi.mock('../lib/api', () => ({
   healthCheck: vi.fn(),
   getEntitlements: vi.fn().mockResolvedValue({ data: { plan: 'FREE' } }),
+  refreshSession: vi.fn().mockRejectedValue(new Error('No stored session')),
+  loginWithGoogle: vi.fn(),
+  logoutSession: vi.fn(),
+  setApiSession: vi.fn(),
+  setApiSessionCallbacks: vi.fn(),
 }));
 
 describe('Layout Health Polling & Degraded State', () => {

@@ -1,4 +1,7 @@
-const WS_BASE = 'ws://localhost:8000/ws';
+import { API_BASE_URL } from './api';
+
+const apiUrl = new URL(API_BASE_URL);
+const WS_BASE = `${apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'}//${apiUrl.host}/ws`;
 
 export async function createScanSocket(scanId, { onMessage, onClose, onError }) {
   let ws = null;
@@ -8,7 +11,7 @@ export async function createScanSocket(scanId, { onMessage, onClose, onError }) 
   let token = null;
 
   async function fetchToken() {
-    const res = await fetch('http://localhost:8000/api/auth/token');
+    const res = await fetch(`${API_BASE_URL}/api/auth/token`);
     const data = await res.json();
     return data.token;
   }

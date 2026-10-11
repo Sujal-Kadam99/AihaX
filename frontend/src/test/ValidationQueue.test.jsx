@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ValidationQueue from '../components/ValidationQueue';
+import { ToastProvider } from '../context/ToastContext';
 
 const mockGet = vi.fn();
 const mockPost = vi.fn();
@@ -66,7 +67,7 @@ describe('ValidationQueue Component (Phase 21)', () => {
       return Promise.reject(new Error('not found'));
     });
 
-    render(<ValidationQueue campaignId="camp-123" targetUrl="https://account.example.com" />);
+    render(<ToastProvider><ValidationQueue campaignId="camp-123" targetUrl="https://account.example.com" /></ToastProvider>);
 
     await waitFor(() => {
       expect(screen.getByText('https://account.example.com')).toBeDefined();
@@ -109,7 +110,7 @@ describe('ValidationQueue Component (Phase 21)', () => {
 
     mockPost.mockResolvedValue({ data: { success: true, data: { decision: 'REJECT' } } });
 
-    render(<ValidationQueue campaignId="camp-123" targetUrl="https://account.example.com" />);
+    render(<ToastProvider><ValidationQueue campaignId="camp-123" targetUrl="https://account.example.com" /></ToastProvider>);
 
     await waitFor(() => {
       expect(screen.getByText('Reject')).toBeDefined();

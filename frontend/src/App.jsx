@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Targets from './pages/Targets';
@@ -22,6 +22,7 @@ import Workspaces from './pages/Workspaces';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import ToastContainer from './components/ui/Toast';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 
@@ -30,10 +31,10 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <ToastProvider>
-          <BrowserRouter>
+          <HashRouter>
             <ErrorBoundary>
               <Routes>
-                <Route element={<Layout />}>
+                <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 {/* Simplified Desktop-First Console Routes */}
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/targets" element={<Targets />} />
@@ -59,7 +60,7 @@ export default function App() {
             </Routes>
             </ErrorBoundary>
             <ToastContainer />
-          </BrowserRouter>
+          </HashRouter>
         </ToastProvider>
       </AuthProvider>
     </ThemeProvider>

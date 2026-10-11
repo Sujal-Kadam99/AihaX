@@ -1,11 +1,17 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter, session } = require('electron');
-const { exec, spawn } = require('child_process');
+const { execFile, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const os = require('os');
+const { fileURLToPath } = require('url');
+const { isPathWithin, validateDeepLink } = require('./security');
 const { createTray, updateTrayStatus } = require('./tray');
 const { setupUpdater } = require('./updater');
+
+const dotenv = require('dotenv');
+dotenv.config({ path: path.join(os.homedir(), 'AihaX', 'config', '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Setup Crash Reporter
 crashReporter.start({
@@ -21,7 +27,6 @@ const HEALTH_TIMEOUT = 60000;
 const HEALTH_POLL_INTERVAL = 2000;
 
 let mainWindow = null;
-let dockerProcess = null;
 
 // Deep link protocol registration
 if (process.defaultApp) {
@@ -43,7 +48,7 @@ function getAihaXPaths() {
 
 function checkDockerRunning() {
   return new Promise((resolve) => {
-    exec('docker info', { timeout: 10000 }, (error) => {
+    execFile('docker', ['info'], { timeout: 10000 }, (error) => {
       resolve(!error);
     });
   });
@@ -65,17 +70,17 @@ function startDockerCompose() {
       AIHAX_REPORTS: paths.reports,
       AIHAX_DB: paths.db,
       AIHAX_CONFIG: paths.config,
+      AIHAX_UID: process.env.AIHAX_UID || '10001',
     };
 
-    dockerProcess = spawn('docker', ['compose', '-f', composePath, 'up', '-d'], {
+    const dockerProcess = spawn('docker', ['compose', '-f', composePath, 'up', '-d'], {
       env,
-      shell: true,
       cwd: getResourcePath('docker'),
     });
 
     dockerProcess.on('close', (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`docker-compose exited with code ${code}`));
+      else reject(new Error(`docker compose exited with code ${code}`));
     });
 
     dockerProcess.on('error', reject);
@@ -127,17 +132,13 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
-  // Strict CSP Headers
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8000 http://localhost:3000 wss://localhost:3000 ws://localhost:3000; img-src 'self' data: https:;"]
-      }
-    });
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedRendererUrl(url)) event.preventDefault();
   });
 
   global.mainWindowRef = mainWindow;
@@ -191,6 +192,17 @@ async function showErrorDialog(message) {
 }
 
 app.whenReady().then(async () => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 ws://localhost:8000 http://localhost:3000 ws://localhost:3000;",
+        ],
+      },
+    });
+  });
+
   let dockerRunning = await checkDockerRunning();
 
   while (!dockerRunning) {
@@ -233,7 +245,7 @@ if (!gotTheLock) {
       mainWindow.focus();
     }
     // Handle deep link logic here
-    const deepLink = commandLine.find(arg => arg.startsWith('aihax://'));
+    const deepLink = commandLine.map(validateDeepLink).find(Boolean);
     if (deepLink && mainWindow) {
         mainWindow.webContents.send('deep-link', deepLink);
     }
@@ -241,8 +253,9 @@ if (!gotTheLock) {
   
   app.on('open-url', (event, url) => {
       event.preventDefault();
-      if (mainWindow) {
-          mainWindow.webContents.send('deep-link', url);
+      const deepLink = validateDeepLink(url);
+      if (deepLink && mainWindow) {
+          mainWindow.webContents.send('deep-link', deepLink);
       }
   });
 }
@@ -251,12 +264,51 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => {
+let shutdownInProgress = false;
+app.on('before-quit', (event) => {
+  if (shutdownInProgress) return;
+  event.preventDefault();
+  shutdownInProgress = true;
   const composePath = path.join(getResourcePath('docker'), 'docker-compose.yml');
-  exec(`docker compose -f "${composePath}" down`, { shell: true });
+  execFile('docker', ['compose', '-f', composePath, 'down'], { cwd: getResourcePath('docker') }, (error) => {
+    if (error) console.warn('Docker compose shutdown failed:', error.message);
+    app.quit();
+  });
 });
 
-ipcMain.handle('open-file-dialog', async () => {
+function isAllowedRendererUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (!app.isPackaged) return url.origin === new URL(FRONTEND_DEV_URL).origin;
+    url.hash = '';
+    url.search = '';
+    return path.resolve(fileURLToPath(url)) === path.resolve(path.join(__dirname, '..', 'frontend', 'dist', 'index.html'));
+  } catch {
+    return false;
+  }
+}
+
+function assertTrustedSender(event) {
+  if (event.senderFrame && event.sender.mainFrame && event.senderFrame !== event.sender.mainFrame) {
+    throw new Error('Rejected IPC from an untrusted frame.');
+  }
+  const url = event.senderFrame?.url || event.sender?.getURL?.();
+  if (!url || !isAllowedRendererUrl(url)) throw new Error('Rejected IPC from an untrusted renderer.');
+}
+
+function isWithinDataDirectory(candidatePath) {
+  const base = path.join(os.homedir(), 'AihaX');
+  try {
+    const resolvedBase = fs.realpathSync(base);
+    const resolvedCandidate = fs.realpathSync(candidatePath);
+    return isPathWithin(resolvedBase, resolvedCandidate);
+  } catch {
+    return false;
+  }
+}
+
+ipcMain.handle('open-file-dialog', async (event) => {
+  assertTrustedSender(event);
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [{ name: 'PDF Reports', extensions: ['pdf'] }],
@@ -264,12 +316,20 @@ ipcMain.handle('open-file-dialog', async () => {
   return result.filePaths[0] || null;
 });
 
-ipcMain.handle('open-folder', async (_, folderPath) => {
+ipcMain.handle('open-folder', async (event, folderPath) => {
+  assertTrustedSender(event);
   const paths = getAihaXPaths();
-  await shell.openPath(folderPath || paths.reports);
+  const target = folderPath || paths.reports;
+  fs.mkdirSync(paths.reports, { recursive: true });
+  if (!isWithinDataDirectory(target)) throw new Error('Folder must be inside the AihaX data directory.');
+  const error = await shell.openPath(target);
+  if (error) throw new Error(error);
 });
 
-ipcMain.handle('get-paths', () => getAihaXPaths());
+ipcMain.handle('get-paths', (event) => {
+  assertTrustedSender(event);
+  return getAihaXPaths();
+});
 
 // -----------------------------------------------------------------------------
 // Security & Authentication IPC Handlers (safeStorage + System Browser PKCE)
@@ -282,7 +342,8 @@ function getSessionEncFilePath() {
   return path.join(paths.config, 'session.enc');
 }
 
-ipcMain.handle('auth:store-refresh-token', async (_, refreshToken) => {
+ipcMain.handle('auth:store-refresh-token', async (event, refreshToken) => {
+  assertTrustedSender(event);
   if (!refreshToken) return false;
   try {
     const encPath = getSessionEncFilePath();
@@ -302,7 +363,8 @@ ipcMain.handle('auth:store-refresh-token', async (_, refreshToken) => {
   }
 });
 
-ipcMain.handle('auth:get-refresh-token', async () => {
+ipcMain.handle('auth:get-refresh-token', async (event) => {
+  assertTrustedSender(event);
   try {
     const encPath = getSessionEncFilePath();
     if (!fs.existsSync(encPath)) return null;
@@ -318,7 +380,8 @@ ipcMain.handle('auth:get-refresh-token', async () => {
   }
 });
 
-ipcMain.handle('auth:clear-refresh-token', async () => {
+ipcMain.handle('auth:clear-refresh-token', async (event) => {
+  assertTrustedSender(event);
   try {
     const encPath = getSessionEncFilePath();
     if (fs.existsSync(encPath)) {
@@ -330,7 +393,10 @@ ipcMain.handle('auth:clear-refresh-token', async () => {
   }
 });
 
-ipcMain.handle('auth:start-oauth', async (_, googleClientId) => {
+ipcMain.handle('auth:start-oauth', async (event) => {
+  assertTrustedSender(event);
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  if (!googleClientId) throw new Error('Set GOOGLE_CLIENT_ID in the AihaX process environment or root .env file.');
   return startDesktopOAuthFlow(googleClientId);
 });
 

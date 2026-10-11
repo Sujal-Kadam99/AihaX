@@ -8,12 +8,14 @@ contextBridge.exposeInMainWorld('aihax', {
   storeRefreshToken: (token) => ipcRenderer.invoke('auth:store-refresh-token', token),
   getRefreshToken: () => ipcRenderer.invoke('auth:get-refresh-token'),
   clearRefreshToken: () => ipcRenderer.invoke('auth:clear-refresh-token'),
-  startOAuth: (clientId) => ipcRenderer.invoke('auth:start-oauth', clientId),
+  startOAuth: () => ipcRenderer.invoke('auth:start-oauth'),
   
   // App Shell Bridges
   getSystemInfo: () => ({ platform: process.platform, arch: process.arch }),
   onDeepLink: (callback) => {
-    ipcRenderer.on('deep-link', (event, url) => callback(url));
+    const listener = (_event, url) => callback(url);
+    ipcRenderer.on('deep-link', listener);
+    return () => ipcRenderer.removeListener('deep-link', listener);
   },
   showNotification: (title, body) => {
     if (Notification.permission === 'granted') {

@@ -5,7 +5,7 @@ import Button from '../ui/Button';
 import Alert from '../ui/Alert';
 
 export default function LoginModal({ isOpen, onClose }) {
-  const { loginWithMock, error } = useAuth();
+  const { loginWithGoogle, loginWithMock, error } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [localError, setLocalError] = useState(null);
 
@@ -13,9 +13,14 @@ export default function LoginModal({ isOpen, onClose }) {
     setIsLoading(true);
     setLocalError(null);
     try {
-      // In production desktop app, triggers system browser PKCE.
-      // In development mode, executes token assertion flow.
-      await loginWithMock('google_user');
+      if (window.aihax?.startOAuth) {
+        const idToken = await window.aihax.startOAuth();
+        await loginWithGoogle(idToken);
+      } else if (import.meta.env.DEV) {
+        await loginWithMock('google_user');
+      } else {
+        throw new Error('Desktop sign-in is unavailable in this build.');
+      }
       if (onClose) onClose();
     } catch (err) {
       setLocalError(err.message || 'Login failed');
@@ -25,7 +30,7 @@ export default function LoginModal({ isOpen, onClose }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Sign in to AihaX" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title="Sign in to AihaX" maxWidth="max-w-sm">
       <div className="space-y-5 py-2">
         <p className="text-sm text-text-secondary">
           Authenticate with your cloud identity to access automated security scans and reports.

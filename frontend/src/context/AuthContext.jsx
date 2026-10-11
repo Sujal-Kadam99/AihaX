@@ -1,5 +1,12 @@
 import { createContext, useCallback, useEffect, useState } from 'react';
-import { getEntitlements } from '../lib/api';
+import {
+  getEntitlements,
+  loginWithGoogle as submitGoogleLogin,
+  logoutSession,
+  refreshSession,
+  setApiSession,
+  setApiSessionCallbacks,
+} from '../lib/api';
 
 export const AUTH_STATES = {
   UNKNOWN: 'UNKNOWN',
@@ -35,86 +42,105 @@ export const AuthProvider = ({ children }) => {
   const syncRefreshToken = useCallback(async (tokenStr) => {
     setRefreshTokenState(tokenStr);
     if (tokenStr && window.aihax?.storeRefreshToken) {
-      await window.aihax.storeRefreshToken(tokenStr).catch(() => {});
+      await window.aihax.storeRefreshToken(tokenStr).catch(() => {
+        console.warn('Secure refresh-token storage failed.');
+      });
     } else if (!tokenStr && window.aihax?.clearRefreshToken) {
-      await window.aihax.clearRefreshToken().catch(() => {});
+      await window.aihax.clearRefreshToken().catch(() => {
+        console.warn('Secure refresh-token cleanup failed.');
+      });
     }
   }, []);
 
-  // Initialize Auth State on Mount
+  const applyRefreshedSession = useCallback(async (result) => {
+    setAccessToken(result.access_token);
+    await syncRefreshToken(result.refresh_token);
+    if (result.user) setUser(result.user);
+    setAuthState(AUTH_STATES.AUTHENTICATED);
+  }, [syncRefreshToken]);
+
   useEffect(() => {
+    setApiSessionCallbacks({
+      onRefreshed: applyRefreshedSession,
+      onExpired: async () => {
+        setApiSession(null, null);
+        setAccessToken(null);
+        await syncRefreshToken(null);
+        setUser(null);
+        setTier('free');
+        setAuthState(AUTH_STATES.LOGGED_OUT);
+      },
+    });
+    return () => setApiSessionCallbacks();
+  }, [applyRefreshedSession, syncRefreshToken]);
+
+  // Restore the OS-stored refresh token and rotate it before protected pages render.
+  useEffect(() => {
+    let cancelled = false;
     const initAuth = async () => {
-      let storedToken = refreshToken;
-      if (!storedToken && window.aihax?.getRefreshToken) {
-        storedToken = await window.aihax.getRefreshToken().catch(() => null);
-        if (storedToken) setRefreshTokenState(storedToken);
+      const storedToken = await window.aihax?.getRefreshToken?.().catch(() => null);
+      if (!storedToken) {
+        if (!cancelled) setAuthState(AUTH_STATES.LOGGED_OUT);
+        return;
       }
 
-      if (!accessToken && !storedToken) {
+      setAuthState(AUTH_STATES.REFRESHING);
+      try {
+        const { data } = await refreshSession(storedToken);
+        if (cancelled) return;
+        setApiSession(data.access_token, data.refresh_token);
+        await applyRefreshedSession(data);
+        const entitlements = await getEntitlements();
+        if (!cancelled) setTier(entitlements.data.tier);
+      } catch {
+        if (cancelled) return;
+        setApiSession(null, null);
+        await syncRefreshToken(null);
         setAuthState(AUTH_STATES.LOGGED_OUT);
-      } else if (accessToken) {
-        // Fetch entitlements on active token
-        getEntitlements()
-          .then((res) => setTier(res.data.tier))
-          .catch(() => setTier('free'));
       }
     };
     initAuth();
-  }, [accessToken, refreshToken]);
+    return () => { cancelled = true; };
+  }, [applyRefreshedSession, syncRefreshToken]);
 
   const loginWithGoogle = useCallback(async (idToken) => {
     setAuthState(AUTH_STATES.AUTHENTICATING);
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/google/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_token: idToken }),
-      });
-
-      const result = await response.json();
-      if (!response.ok || !result.access_token) {
-        throw new Error(result.detail || (result.error && result.error.message) || 'Authentication failed');
-      }
-
-      setAccessToken(result.access_token);
-      await syncRefreshToken(result.refresh_token);
-      setUser(result.user);
-      
+      const { data: result } = await submitGoogleLogin(idToken);
+      if (!result.access_token) throw new Error('Authentication failed');
+      setApiSession(result.access_token, result.refresh_token);
+      await applyRefreshedSession(result);
       try {
         const entRes = await getEntitlements();
         setTier(entRes.data.tier);
-      } catch (err) {
+      } catch {
         setTier('free');
       }
 
-      setAuthState(AUTH_STATES.AUTHENTICATED);
       return result.user;
     } catch (err) {
       setError(err.message);
       setAuthState(AUTH_STATES.AUTH_ERROR);
       throw err;
     }
-  }, [syncRefreshToken]);
+  }, [applyRefreshedSession]);
 
   const loginWithMock = useCallback(async (mockIdentifier = 'demo_user') => {
+    if (!import.meta.env.DEV) throw new Error('Mock sign-in is available only in development builds.');
     return loginWithGoogle(`mock_id_token_${mockIdentifier}`);
   }, [loginWithGoogle]);
 
   const logout = useCallback(async () => {
     try {
       if (accessToken && refreshToken) {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        }).catch(() => {});
+        await logoutSession(refreshToken).catch(() => {
+          console.warn('Server-side session logout failed.');
+        });
       }
     } finally {
+      setApiSession(null, null);
       setAccessToken(null);
       await syncRefreshToken(null);
       setUser(null);

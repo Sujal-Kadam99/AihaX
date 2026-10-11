@@ -1,46 +1,90 @@
 import axios from 'axios';
 
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: API_BASE_URL,
   timeout: 30000,
 });
 
 let tokenPromise = null;
+let localApiToken = null;
+let accessToken = null;
+let refreshToken = null;
+let refreshPromise = null;
+let onSessionRefreshed = () => {};
+let onSessionExpired = () => {};
 
 async function ensureToken() {
-  if (api.defaults.headers.common['X-AihaX-Token']) return;
+  if (localApiToken) return localApiToken;
   if (!tokenPromise) {
     tokenPromise = axios
-      .get('http://localhost:8000/api/auth/token')
+      .get(`${API_BASE_URL}/api/auth/token`)
       .then((res) => {
-        api.defaults.headers.common['X-AihaX-Token'] = res.data.token;
+        localApiToken = res.data.token;
+        return localApiToken;
       })
-      .catch((err) => {
+      .finally(() => {
         tokenPromise = null;
-        throw err;
       });
   }
-  await tokenPromise;
+  return tokenPromise;
+}
+
+export function setApiSession(access, refresh) {
+  accessToken = access || null;
+  refreshToken = refresh || null;
+}
+
+export function setApiSessionCallbacks({ onRefreshed, onExpired } = {}) {
+  onSessionRefreshed = onRefreshed || (() => {});
+  onSessionExpired = onExpired || (() => {});
 }
 
 api.interceptors.request.use(async (config) => {
-  if (!config.url?.includes('/api/auth/token') && !config.url?.includes('/api/health')) {
-    await ensureToken();
-    const token = api.defaults.headers.common['X-AihaX-Token'];
-    if (token) {
-      if (config.headers && typeof config.headers.set === 'function') {
-        config.headers.set('X-AihaX-Token', token);
-      } else {
-        config.headers['X-AihaX-Token'] = token;
-      }
-    }
+  if (!config.url?.includes('/api/health')) {
+    config.headers.set('X-AihaX-Token', await ensureToken());
   }
+  if (accessToken) config.headers.set('Authorization', `Bearer ${accessToken}`);
   return config;
 });
 
+api.interceptors.response.use(undefined, async (error) => {
+  const config = error.config;
+  const url = config?.url || '';
+  if (error.response?.status !== 401 || !config || config._authRetried || !refreshToken
+    || url.includes('/api/auth/refresh') || url.includes('/api/auth/google/login')) {
+    throw error;
+  }
+
+  config._authRetried = true;
+  try {
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        const token = await ensureToken();
+        const { data } = await axios.post(
+          `${API_BASE_URL}/api/auth/refresh`,
+          { refresh_token: refreshToken },
+          { headers: { 'X-AihaX-Token': token }, timeout: 10000 },
+        );
+        setApiSession(data.access_token, data.refresh_token);
+        await onSessionRefreshed(data);
+      })().finally(() => { refreshPromise = null; });
+    }
+    await refreshPromise;
+    return api.request(config);
+  } catch (refreshError) {
+    setApiSession(null, null);
+    await onSessionExpired();
+    throw refreshError;
+  }
+});
+
+export const loginWithGoogle = (idToken) => api.post('/api/auth/google/login', { id_token: idToken });
+export const refreshSession = (token) => api.post('/api/auth/refresh', { refresh_token: token });
+export const logoutSession = (token) => api.post('/api/auth/logout', { refresh_token: token });
+
 export async function getApiToken() {
-  await ensureToken();
-  return api.defaults.headers.common['X-AihaX-Token'];
+  return ensureToken();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

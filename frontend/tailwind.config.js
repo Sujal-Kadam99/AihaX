@@ -31,10 +31,9 @@ export default {
         'warning-bg': 'var(--color-warning-bg)',
         success: 'var(--color-success)',
         'success-bg': 'var(--color-success-bg)',
-        'surface-1': 'var(--color-bg-surface)',
       },
       fontFamily: {
-        display: ['"JetBrains Mono"', 'monospace'],
+        display: ['Inter', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
         code: ['"JetBrains Mono"', 'monospace'],
       },

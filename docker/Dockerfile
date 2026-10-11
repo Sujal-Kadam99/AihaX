@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Keep the runtime on a fixed Python base image; renovate this digest deliberately.
+FROM python:3.11.14-slim-bookworm@sha256:83f339c1be6340ae1096010fdccf6552ac932d8f410d45d206014916bdf37e48
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -60,6 +61,11 @@ COPY templates/ /app/templates/
 
 # Create volume mount directories
 RUN mkdir -p /app/reports /app/db /app/config /app/screenshots
+
+ARG AIHAX_UID=10001
+RUN useradd --system --uid "${AIHAX_UID}" --create-home --home-dir /home/aihax aihax \
+    && chown -R aihax:aihax /app /home/aihax
+USER aihax
 
 EXPOSE 8000
 
