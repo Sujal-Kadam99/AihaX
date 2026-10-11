@@ -16,7 +16,6 @@ from backend.core.check_registry import (
 )
 from backend.services.request_engine import RequestEngine, RequestSpec, RequestTimeout
 
-
 SENSITIVE_PARAMETER = re.compile(r"password|passwd|secret|token|api.?key|session|cookie|csrf|credit.?card|ssn", re.I)
 HIGH_VALUE_PARAMETER = re.compile(r"^(q|query|search|term|filter|id)$", re.I)
 

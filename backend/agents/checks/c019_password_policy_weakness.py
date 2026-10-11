@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import json
-from urllib.parse import urlparse
 from typing import Any, Dict, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from backend.core.check_registry import (
     BaseCheck,

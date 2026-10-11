@@ -65,7 +65,7 @@ class C065UnencryptedTransmission(BaseCheck):
                 affected_url=http_url,
                 vulnerability_type=self.contract.vulnerability_type,
                 severity=Severity.HIGH,
-                candidate_reason=f"Application responds with HTTP 200 OK over unencrypted HTTP without redirecting to HTTPS.",
+                candidate_reason="Application responds with HTTP 200 OK over unencrypted HTTP without redirecting to HTTPS.",
                 request_ids=[resp.request_id],
                 evidence_ids=[resp.evidence_id],
                 observed_data={"http_url": http_url, "status": resp.response_status},

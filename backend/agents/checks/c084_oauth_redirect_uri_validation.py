@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
 import urllib.parse
+from typing import Any, Dict, Optional
 
 from backend.core.check_registry import (
     BaseCheck,
