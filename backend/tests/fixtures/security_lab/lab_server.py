@@ -841,7 +841,7 @@ def create_security_lab_app() -> web.Application:
 
     async def h_param_calc_static(request: web.Request) -> web.Response:
         expr = request.query.get("expr", "")
-        return web.Response(text=f"<html><body>Static Output: static_literal</body></html>", content_type="text/html")
+        return web.Response(text="<html><body>Static Output: static_literal</body></html>", content_type="text/html")
 
     async def h_param_sql_syntax_error(request: web.Request) -> web.Response:
         id_param = request.query.get("id", "1")

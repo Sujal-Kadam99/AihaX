@@ -1,13 +1,14 @@
+from backend.services.request_engine import RequestSpec
 from backend.services.verification_engine import (
     BaseVerificationStrategy,
-    VerificationContract,
     VerificationConclusion,
     VerificationContext,
-    VerificationStatus,
+    VerificationContract,
     VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.request_engine import RequestSpec
 from backend.services.verification_strategies.request_builder import build_injected_request
+
 
 class SqlInjectionVerificationStrategy(BaseVerificationStrategy):
     contract = VerificationContract(
@@ -133,9 +134,9 @@ class SqlInjectionVerificationStrategy(BaseVerificationStrategy):
             threshold = max(variance_len * 2, 50, int(len_base * 0.05))
 
             is_false_collapse = (
-                diff_false_true > threshold and 
-                diff_false_base > threshold and 
-                len_false < len_base and 
+                diff_false_true > threshold and
+                diff_false_base > threshold and
+                len_false < len_base and
                 len_false < len_true
             )
             
@@ -147,8 +148,8 @@ class SqlInjectionVerificationStrategy(BaseVerificationStrategy):
             )
             
             is_flat_true = (
-                diff_false_true > threshold and 
-                diff_false_base > threshold and 
+                diff_false_true > threshold and
+                diff_false_base > threshold and
                 diff_true_base <= threshold
             )
 

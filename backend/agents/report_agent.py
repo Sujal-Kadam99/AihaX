@@ -14,8 +14,8 @@ class ReportAgent(BaseAgent):
     agent_id = 9
 
     async def execute(self) -> dict[str, Any]:
-        from backend.services.bug_bounty_generator import BugBountyReportGenerator
         from backend.core.encryption import CredentialVault
+        from backend.services.bug_bounty_generator import BugBountyReportGenerator
 
         settings = get_settings()
         scan: Optional[Scan] = self.db.query(Scan).filter_by(id=self.scan_id).first()

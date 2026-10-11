@@ -1,14 +1,16 @@
+import base64
+import json
+
 from backend.services.verification_engine import (
-    VerificationStatus,
-    VerificationReasonCode,
-    VerificationConclusion,
     BaseVerificationStrategy,
+    VerificationConclusion,
     VerificationContext,
     VerificationContract,
+    VerificationReasonCode,
+    VerificationStatus,
 )
 from backend.services.verification_strategies.request_builder import build_injected_request
-import json
-import base64
+
 
 class JwtVerificationStrategy(BaseVerificationStrategy):
     """

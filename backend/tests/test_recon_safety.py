@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+
 import pytest
 
 from backend.core.scope_validator import ScopeValidator

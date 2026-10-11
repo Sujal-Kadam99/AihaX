@@ -57,7 +57,7 @@ class BugBountyReportGenerator:
             )
             default_steps = [
                 f"1. Send an authorized HTTP request to target URL: '{finding.affected_url}'.",
-                f"2. Inspect the server HTTP response headers and directives.",
+                "2. Inspect the server HTTP response headers and directives.",
                 f"3. Observe that the recommended security control ({vuln_type}) is absent in the response.",
             ]
             confirmed_impact = (
@@ -65,8 +65,8 @@ class BugBountyReportGenerator:
                 f"No active exploitation or security boundary bypass was demonstrated."
             )
             potential_impact = (
-                f"[INFERENCE] In specific threat scenarios, absence of this defense-in-depth control may weaken "
-                f"client-side browser protections or transport security guarantees."
+                "[INFERENCE] In specific threat scenarios, absence of this defense-in-depth control may weaken "
+                "client-side browser protections or transport security guarantees."
             )
         else:
             default_summary = (

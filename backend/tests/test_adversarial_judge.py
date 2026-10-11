@@ -1,6 +1,8 @@
 import pytest
-from backend.services.adversarial_judge import AdversarialJudge, Claim
+
 from backend.models.database import FindingDisposition
+from backend.services.adversarial_judge import AdversarialJudge, Claim
+
 
 def test_adversarial_judge_high_high():
     prosecutor = Claim("PROSECUTOR", "REAL", 0.9)

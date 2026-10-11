@@ -21,7 +21,6 @@ from backend.models.database import Finding
 from backend.services.campaign_executor import CampaignResult
 from backend.services.coverage_validator import CampaignCoverageReport
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. RISK PRIORITIZER
 # ──────────────────────────────────────────────────────────────────────────────

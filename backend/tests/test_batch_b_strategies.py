@@ -4,20 +4,27 @@
 - DefaultCredentialsVerificationStrategy
 """
 
-import pytest
 import re
 from unittest.mock import AsyncMock
 
-from backend.services.verification_engine import (
-    VerificationContext,
-    VerificationBudget,
-    VerificationStatus,
-    VerificationReasonCode,
-)
+import pytest
+
 from backend.services.request_engine import RequestEngine, RequestEvidence
-from backend.services.verification_strategies.directory_listing_strategy import DirectoryListingVerificationStrategy
-from backend.services.verification_strategies.verbose_error_strategy import VerboseErrorVerificationStrategy
-from backend.services.verification_strategies.default_credentials_strategy import DefaultCredentialsVerificationStrategy
+from backend.services.verification_engine import (
+    VerificationBudget,
+    VerificationContext,
+    VerificationReasonCode,
+    VerificationStatus,
+)
+from backend.services.verification_strategies.default_credentials_strategy import (
+    DefaultCredentialsVerificationStrategy,
+)
+from backend.services.verification_strategies.directory_listing_strategy import (
+    DirectoryListingVerificationStrategy,
+)
+from backend.services.verification_strategies.verbose_error_strategy import (
+    VerboseErrorVerificationStrategy,
+)
 
 
 @pytest.fixture

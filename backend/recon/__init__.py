@@ -1,6 +1,11 @@
 """AihaX Reconnaissance, Asset Intelligence, and Check Orchestration Module."""
 
-from backend.recon.asset_discovery import AssetDiscoveryEngine, PassiveFeedProvider, ScopedWordlistProvider, SubdomainDiscoveryProvider
+from backend.recon.asset_discovery import (
+    AssetDiscoveryEngine,
+    PassiveFeedProvider,
+    ScopedWordlistProvider,
+    SubdomainDiscoveryProvider,
+)
 from backend.recon.auth_mapper import AuthMapper
 from backend.recon.capability_mapper import CapabilityMapper
 from backend.recon.endpoint_discovery import EndpointDiscoveryEngine
@@ -66,17 +71,6 @@ __all__ = [
     "TechnologyFingerprintProvider",
 ]
 
-from backend.recon.recon_modes import (
-    NormalizedReconAsset,
-    ProviderMetadata,
-    ProviderStatus,
-    ProviderType,
-    ReconAssetStatus,
-    ReconContext,
-    ReconExecutionMode,
-)
-from backend.recon.recon_preflight import PreflightStatus, ReconPreflightDecision, ReconPreflightGate
-from backend.recon.snapshot import CanonicalReconSnapshot
 from backend.recon.providers import (
     AmassProvider,
     CertificateTransparencyProvider,
@@ -86,4 +80,19 @@ from backend.recon.providers import (
     Sublist3rProvider,
     TechnologyFingerprintProvider,
 )
+from backend.recon.recon_modes import (
+    NormalizedReconAsset,
+    ProviderMetadata,
+    ProviderStatus,
+    ProviderType,
+    ReconAssetStatus,
+    ReconContext,
+    ReconExecutionMode,
+)
 from backend.recon.recon_orchestrator import UnifiedReconOrchestrator
+from backend.recon.recon_preflight import (
+    PreflightStatus,
+    ReconPreflightDecision,
+    ReconPreflightGate,
+)
+from backend.recon.snapshot import CanonicalReconSnapshot

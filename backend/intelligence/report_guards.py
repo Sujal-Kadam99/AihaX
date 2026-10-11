@@ -21,9 +21,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from backend.models.database import Finding
 from backend.services.finding_deduplicator import (
+    VALID_TRANSITIONS,
     EvidenceHasher,
     FindingLifecycleState,
-    VALID_TRANSITIONS,
     can_transition,
 )
 

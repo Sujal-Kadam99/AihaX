@@ -1,7 +1,9 @@
 """Tests for Campaign Request Budgeting and Concurrency Boundaries."""
 
 import asyncio
+
 import pytest
+
 from backend.core.scope_validator import ScopeValidator
 from backend.services.campaign_executor import (
     CampaignExecutor,

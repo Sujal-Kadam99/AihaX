@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.core.auth import get_current_user
 from backend.core.entitlements import EntitlementManager, get_user_tier, require_team
 from backend.models.database import (
     EntitlementCache,
@@ -17,7 +18,6 @@ from backend.models.database import (
     User,
     get_db,
 )
-from backend.core.auth import get_current_user
 
 router = APIRouter(prefix="/api/organizations", tags=["Team Workspaces"])
 

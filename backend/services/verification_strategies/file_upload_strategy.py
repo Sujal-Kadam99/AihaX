@@ -1,14 +1,16 @@
+import re
+import uuid
+
 from backend.services.verification_engine import (
-    VerificationStatus,
-    VerificationReasonCode,
-    VerificationConclusion,
     BaseVerificationStrategy,
+    VerificationConclusion,
     VerificationContext,
     VerificationContract,
+    VerificationReasonCode,
+    VerificationStatus,
 )
 from backend.services.verification_strategies.request_builder import build_injected_request
-import uuid
-import re
+
 
 class FileUploadVerificationStrategy(BaseVerificationStrategy):
     """
@@ -101,7 +103,7 @@ class FileUploadVerificationStrategy(BaseVerificationStrategy):
             return VerificationConclusion(
                 status=VerificationStatus.VERIFIED,
                 reason_code=VerificationReasonCode.REPRODUCED_SUCCESSFULLY,
-                reason_description=f"Upload accepted, but couldn't verify access URL. Manual check recommended.",
+                reason_description="Upload accepted, but couldn't verify access URL. Manual check recommended.",
                 evidence_ids=[ev_id_upload],
                 request_ids=[response.request_id],
                 confidence=80,

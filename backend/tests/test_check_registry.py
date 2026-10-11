@@ -1,18 +1,20 @@
 """Unit & integration tests for Check Registry and Phase 4 checks."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
 from typing import Any, Dict, Optional
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from pydantic import ValidationError
 
+import backend.agents.checks  # Load all 7 checks into global registry
 from backend.core.check_registry import (
     BaseCheck,
     CheckCategory,
     CheckContract,
+    CheckRegistry,
     CheckResult,
     EvidenceContract,
     Severity,
-    CheckRegistry,
     registry,
 )
 from backend.core.scope_validator import ScopeValidator
@@ -22,7 +24,6 @@ from backend.services.request_engine import (
     RequestEvidence,
     RequestSpec,
 )
-import backend.agents.checks  # Load all 7 checks into global registry
 
 
 @pytest.fixture

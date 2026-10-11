@@ -12,8 +12,9 @@ Verifies all mandatory certification gates:
 
 import hashlib
 import os
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from backend.recon.live_recon_validator import (
     ExecutionOrigin,

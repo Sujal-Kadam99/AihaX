@@ -14,7 +14,12 @@ from backend.core.check_registry import (
     Severity,
     registry,
 )
-from backend.services.request_engine import AuthenticationContext, RequestEngine, RequestSpec, RequestTimeout
+from backend.services.request_engine import (
+    AuthenticationContext,
+    RequestEngine,
+    RequestSpec,
+    RequestTimeout,
+)
 
 
 class C077MissingReauthentication(BaseCheck):

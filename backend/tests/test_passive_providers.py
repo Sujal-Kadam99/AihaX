@@ -2,8 +2,9 @@
 
 import asyncio
 import json
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from backend.core.scope_validator import ScopeValidator
 from backend.services.discovery.alienvault_provider import AlienVaultProvider

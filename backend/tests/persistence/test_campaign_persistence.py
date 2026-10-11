@@ -1,13 +1,14 @@
 """AihaX Phase 8 — Campaign Persistence Unit Tests."""
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.models.database import Base
-from backend.persistence.models import Campaign, CampaignTarget, ExecutionTask, AuthorizationRecord
+from backend.persistence.models import AuthorizationRecord, Campaign, CampaignTarget, ExecutionTask
 from backend.persistence.repository import CampaignRepository
 from backend.persistence.state_machine import CampaignLifecycleState, InvalidStateTransitionError
 

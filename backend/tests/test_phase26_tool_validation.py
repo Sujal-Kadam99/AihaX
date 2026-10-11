@@ -27,7 +27,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -56,7 +55,6 @@ from backend.recon.recon_tool_availability import (
     ToolDiagnosticResult,
     ToolInventoryRecord,
 )
-
 
 # ==============================================================================
 # In-Memory DB Fixture for Authorization Testing
@@ -491,7 +489,6 @@ class TestPhase26WhatWeb:
     async def test_whatweb_technology_json_parsing(self):
         """JSON output is parsed and normalized into technology assets."""
         def mock_whatweb_runner(cmd, args, timeout):
-            import json
             payload = [{
                 "target": "https://www.mitacsc.ac.in",
                 "http_status": 200,

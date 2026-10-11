@@ -50,7 +50,11 @@ from backend.core.check_registry import (
     Severity,
     registry,
 )
-from backend.core.scope_validator import ScopeValidator, validate_concrete_target_url, validate_destination_safety
+from backend.core.scope_validator import (
+    ScopeValidator,
+    validate_concrete_target_url,
+    validate_destination_safety,
+)
 from backend.evidence.evidence_manifest import ManifestBuilder, compute_manifest_hash
 from backend.evidence.evidence_store import EvidenceVault
 from backend.evidence.integrity import compute_evidence_content_hash, verify_evidence_integrity
@@ -87,7 +91,11 @@ from backend.services.request_engine import (
     RequestTimeout,
     TransportError,
 )
-from backend.services.verification_engine import VerificationConclusion, VerificationEngine, VerificationStatus
+from backend.services.verification_engine import (
+    VerificationConclusion,
+    VerificationEngine,
+    VerificationStatus,
+)
 
 
 class Step5ControlledGuardTransport(MockTransport):

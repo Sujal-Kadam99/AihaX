@@ -1,10 +1,13 @@
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
-from backend.main import app
-from backend.models.database import Finding, Scan, User, get_db, init_db, get_engine
 from sqlalchemy.orm import sessionmaker
+
 from backend.core.auth import get_current_user
-import uuid
+from backend.main import app
+from backend.models.database import Finding, Scan, User, get_db, get_engine, init_db
+
 
 @pytest.fixture(autouse=True)
 def setup_db(monkeypatch, tmp_path):

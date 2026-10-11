@@ -1,6 +1,7 @@
 """AihaX Phase 8 — Secret Redaction Engine Unit Tests."""
 
 import pytest
+
 from backend.evidence.redaction import (
     contains_unredacted_secrets,
     redact_dictionary,

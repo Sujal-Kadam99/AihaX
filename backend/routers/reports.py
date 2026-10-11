@@ -3,7 +3,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from backend.core.auth import _is_local_request
-from backend.models.database import get_db, Scan
+from backend.models.database import Scan, get_db
 from backend.persistence.models import Campaign
 from backend.services.report_generator import generate_scan_report
 

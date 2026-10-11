@@ -9,8 +9,9 @@ Guarantees:
 """
 
 import json
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -33,7 +34,6 @@ from backend.persistence.models import Campaign, CampaignTarget, ExecutionTask
 from backend.persistence.repository import CampaignRepository
 from backend.persistence.state_machine import CampaignLifecycleState
 from backend.services.campaign_operations import CampaignOperationsService
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. Deterministic URL Validation Helper Tests

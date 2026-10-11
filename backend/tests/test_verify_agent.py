@@ -1,12 +1,14 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+
 from backend.agents.verify_agent import VerifyAgent
 from backend.models.database import Finding, Scan
 from backend.services.request_engine import MockTransport, RequestEngine
 from backend.services.verification_engine import (
     VerificationEngine,
-    VerificationStatus,
     VerificationReasonCode,
+    VerificationStatus,
 )
 
 

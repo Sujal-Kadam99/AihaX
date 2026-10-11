@@ -6,15 +6,16 @@ file path disclosures.
 """
 
 import re
+
+from backend.services.request_engine import RequestSpec, RequestTimeout
 from backend.services.verification_engine import (
-    VerificationStatus,
-    VerificationReasonCode,
-    VerificationConclusion,
     BaseVerificationStrategy,
+    VerificationConclusion,
     VerificationContext,
     VerificationContract,
+    VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.request_engine import RequestSpec, RequestTimeout
 
 
 class VerboseErrorVerificationStrategy(BaseVerificationStrategy):

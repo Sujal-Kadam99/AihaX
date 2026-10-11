@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
 import urllib.parse
+from typing import Any, Dict, Optional
 
 from backend.services.request_engine import RequestEngine, RequestSpec, RequestTimeout
 from backend.services.verification_engine import (
@@ -13,8 +13,8 @@ from backend.services.verification_engine import (
     VerificationContext,
     VerificationContract,
     VerificationReasonCode,
-    VerificationStatus,
     VerificationRegistry,
+    VerificationStatus,
 )
 
 

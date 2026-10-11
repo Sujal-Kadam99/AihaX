@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 from backend.models.database import Finding
 from backend.services.finding_deduplicator import EvidenceHasher
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. SECRET REDACTION PATTERNS
 # ──────────────────────────────────────────────────────────────────────────────
@@ -288,7 +287,7 @@ class ReproducibilityEngine:
     def _generate_expected_signal(check_id: str, param: Optional[str], payload: Optional[str]) -> str:
         check_upper = check_id.upper()
         if "XSS" in check_upper or "REFLECTED" in check_upper:
-            return f"Canary token reflected in response body/HTML without encoding"
+            return "Canary token reflected in response body/HTML without encoding"
         if "SQL" in check_upper:
             return "SQL error message or boolean-differential response difference"
         if "SSTI" in check_upper:

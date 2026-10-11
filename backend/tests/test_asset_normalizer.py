@@ -1,17 +1,17 @@
 """Unit tests for Deterministic Asset, Domain, IP, URL, and Query Parameter Normalization."""
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from backend.services.discovery.normalizer import (
+    AssetType,
+    normalize_asset,
     normalize_domain,
     normalize_ip,
-    normalize_url,
     normalize_query,
-    normalize_asset,
-    AssetType,
+    normalize_url,
 )
-
 
 # ==============================================================================
 # 1. DOMAIN NORMALIZATION TESTS

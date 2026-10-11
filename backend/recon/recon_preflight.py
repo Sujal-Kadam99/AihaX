@@ -14,7 +14,11 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlparse
 
-from backend.core.scope_validator import ScopeValidator, normalize_domain, validate_destination_safety
+from backend.core.scope_validator import (
+    ScopeValidator,
+    normalize_domain,
+    validate_destination_safety,
+)
 from backend.recon.recon_modes import ReconContext, ReconExecutionMode
 
 logger = logging.getLogger("aihax.recon_preflight")

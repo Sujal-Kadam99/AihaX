@@ -2,6 +2,7 @@
 
 import hashlib
 import secrets
+import socket
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -130,10 +131,8 @@ def get_user_context(request: Request) -> dict[str, str | None]:
 
 def _is_local_request(request: Request) -> bool:
     if not request.client:
-        print("DEBUG_LOCAL_AUTH: No request.client")
         return False
     host = request.client.host or ""
-    print(f"DEBUG_LOCAL_AUTH: Incoming host is {host}")
     if (
         host in LOCAL_HOSTS
         or host.startswith("::ffff:127.0.0.1")

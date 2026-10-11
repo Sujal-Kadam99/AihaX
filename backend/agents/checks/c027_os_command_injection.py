@@ -60,10 +60,10 @@ class C027OSCommandInjection(BaseCheck):
 
         canary_expected = "31337"
         payloads = [
-            f"; expr 31330 + 7 ;",
-            f"| expr 31330 + 7",
-            f"$(expr 31330 + 7)",
-            f"`expr 31330 + 7`",
+            "; expr 31330 + 7 ;",
+            "| expr 31330 + 7",
+            "$(expr 31330 + 7)",
+            "`expr 31330 + 7`",
         ]
         if canary_expected in base_body:
             canary_expected = "54321"

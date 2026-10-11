@@ -12,8 +12,8 @@ from backend.services.verification_engine import (
     VerificationContext,
     VerificationContract,
     VerificationReasonCode,
-    VerificationStatus,
     VerificationRegistry,
+    VerificationStatus,
 )
 
 

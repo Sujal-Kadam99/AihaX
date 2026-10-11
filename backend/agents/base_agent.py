@@ -15,7 +15,6 @@ from backend.core.redis_client import (
 )
 from backend.models.database import AgentLog
 
-
 AGENT_NAMES = {
     0: "Scope Agent",
     1: "Recon Agent",

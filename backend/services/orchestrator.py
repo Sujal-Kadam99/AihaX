@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.agents.auth_agent import AuthAgent
+from backend.agents.base_agent import BaseAgent, ScanCancelledException
 from backend.agents.bugbounty_agent import BugBountyAgent
 from backend.agents.exploit_chain_agent import ExploitChainAgent
 from backend.agents.impact_agent import ImpactAgent
@@ -19,11 +20,11 @@ from backend.agents.report_agent import ReportAgent
 from backend.agents.scope_agent import ScopeAgent
 from backend.agents.verify_agent import VerifyAgent
 from backend.agents.vulnerability_testing_agent import VulnerabilityTestingAgent
-from backend.agents.base_agent import ScanCancelledException, BaseAgent
 from backend.core.encryption import encrypt_data
 from backend.core.redis_client import set_scan_status
 from backend.models.database import Scan, ScanConfig, get_session_factory
 from backend.services.db_service import AuditLogRepository
+
 
 async def _run_with_retry(agent: BaseAgent, max_retries: int = 2) -> None:
     for attempt in range(max_retries + 1):

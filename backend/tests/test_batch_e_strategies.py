@@ -5,8 +5,10 @@ from __future__ import annotations
 import base64
 import json
 from unittest.mock import AsyncMock
+
 import pytest
 
+from backend.services.request_engine import RequestEngine, RequestEvidence
 from backend.services.verification_engine import (
     VerificationBudget,
     VerificationConclusion,
@@ -15,31 +17,58 @@ from backend.services.verification_engine import (
     VerificationRegistry,
     VerificationStatus,
 )
-from backend.services.request_engine import RequestEngine, RequestEvidence
+from backend.services.verification_strategies.cleartext_storage_strategy import (
+    CleartextStorageVerificationStrategy,
+)
+from backend.services.verification_strategies.cloud_bucket_strategy import (
+    CloudBucketExposureVerificationStrategy,
+)
+from backend.services.verification_strategies.comment_disclosure_strategy import (
+    CommentInformationDisclosureVerificationStrategy,
+)
+
+# Group 3 Strategy imports
+from backend.services.verification_strategies.cross_domain_policy_strategy import (
+    CrossDomainPolicyVerificationStrategy,
+)
+from backend.services.verification_strategies.expression_language_strategy import (
+    ExpressionLanguageVerificationStrategy,
+)
+from backend.services.verification_strategies.ldap_injection_strategy import (
+    LdapInjectionVerificationStrategy,
+)
+from backend.services.verification_strategies.local_file_inclusion_strategy import (
+    LocalFileInclusionStrategy,
+)
+from backend.services.verification_strategies.nosql_injection_strategy import (
+    NosqlInjectionVerificationStrategy,
+)
+from backend.services.verification_strategies.password_policy_strategy import (
+    PasswordPolicyVerificationStrategy,
+)
+from backend.services.verification_strategies.path_normalization_strategy import (
+    PathNormalizationVerificationStrategy,
+)
+from backend.services.verification_strategies.path_traversal_strategy import (
+    PathTraversalVerificationStrategy,
+)
+from backend.services.verification_strategies.replay_attack_strategy import (
+    ReplayAttackVerificationStrategy,
+)
+
+# Group 2 Strategy imports
+from backend.services.verification_strategies.session_fixation_strategy import (
+    SessionFixationVerificationStrategy,
+)
 
 # Group 1 Strategy imports
 from backend.services.verification_strategies.ssrf_strategy import SsrfVerificationStrategy
 from backend.services.verification_strategies.ssti_strategy import SstiVerificationStrategy
-from backend.services.verification_strategies.nosql_injection_strategy import NosqlInjectionVerificationStrategy
-from backend.services.verification_strategies.path_traversal_strategy import PathTraversalVerificationStrategy
-from backend.services.verification_strategies.local_file_inclusion_strategy import LocalFileInclusionStrategy
-from backend.services.verification_strategies.ldap_injection_strategy import LdapInjectionVerificationStrategy
-from backend.services.verification_strategies.expression_language_strategy import ExpressionLanguageVerificationStrategy
-
-# Group 2 Strategy imports
-from backend.services.verification_strategies.session_fixation_strategy import SessionFixationVerificationStrategy
-from backend.services.verification_strategies.password_policy_strategy import PasswordPolicyVerificationStrategy
-
-# Group 3 Strategy imports
-from backend.services.verification_strategies.cross_domain_policy_strategy import CrossDomainPolicyVerificationStrategy
-from backend.services.verification_strategies.path_normalization_strategy import PathNormalizationVerificationStrategy
-from backend.services.verification_strategies.comment_disclosure_strategy import CommentInformationDisclosureVerificationStrategy
-from backend.services.verification_strategies.cloud_bucket_strategy import CloudBucketExposureVerificationStrategy
-from backend.services.verification_strategies.cleartext_storage_strategy import CleartextStorageVerificationStrategy
 
 # Group 4 Strategy imports
-from backend.services.verification_strategies.workflow_step_skipping_strategy import WorkflowStepSkippingVerificationStrategy
-from backend.services.verification_strategies.replay_attack_strategy import ReplayAttackVerificationStrategy
+from backend.services.verification_strategies.workflow_step_skipping_strategy import (
+    WorkflowStepSkippingVerificationStrategy,
+)
 
 
 def make_evidence(request_id: str, response_status: int, response_body: str, response_headers: dict | None = None, success: bool = True) -> RequestEvidence:

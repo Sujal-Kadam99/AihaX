@@ -1,11 +1,22 @@
-import pytest
-from fastapi.testclient import TestClient
-from backend.main import app
-from backend.models.database import User, Subscription, Scan, EntitlementCache, get_db, init_db, get_engine
-from sqlalchemy.orm import sessionmaker
-from backend.core.auth import get_current_user
 import uuid
 from datetime import datetime, timedelta, timezone
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import sessionmaker
+
+from backend.core.auth import get_current_user
+from backend.main import app
+from backend.models.database import (
+    EntitlementCache,
+    Scan,
+    Subscription,
+    User,
+    get_db,
+    get_engine,
+    init_db,
+)
+
 
 @pytest.fixture(autouse=True)
 def setup_test_environment():
@@ -111,8 +122,8 @@ def test_freemium_scan_limit_blocked(test_db_session, client, mock_user):
 
 def test_freemium_advanced_features_blocked(client):
     response = client.post("/api/scan/start", json={
-        "target_url": "https://example.com", 
-        "scan_depth": "deep", 
+        "target_url": "https://example.com",
+        "scan_depth": "deep",
         "scan_mode": "standard"
     })
     assert response.status_code == 403
@@ -172,8 +183,8 @@ def test_pro_bypasses_freemium_limits(test_db_session, client, mock_user):
 
     # 4th scan allowed because Pro
     response = client.post("/api/scan/start", json={
-        "target_url": "https://example.com", 
-        "scan_depth": "deep", 
+        "target_url": "https://example.com",
+        "scan_depth": "deep",
         "scan_mode": "standard"
     })
     # Since they are pro, deep scan is allowed.

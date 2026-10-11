@@ -10,7 +10,9 @@ Validates:
 
 import os
 import pathlib
+
 import pytest
+
 from backend.core.check_registry import registry
 from backend.evidence.redaction import contains_unredacted_secrets, redact_secrets
 

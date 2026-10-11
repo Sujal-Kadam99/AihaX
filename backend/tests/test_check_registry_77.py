@@ -1,16 +1,18 @@
 """Comprehensive unit & integration test suite verifying all 77 checks in AihaX CheckRegistry."""
 
-import pytest
 import asyncio
+
+import pytest
+
+import backend.agents.checks  # Trigger registration
 from backend.core.check_registry import (
+    BaseCheck,
     CheckCategory,
     CheckContract,
     CheckRegistry,
-    BaseCheck,
     Severity,
     registry,
 )
-import backend.agents.checks  # Trigger registration
 from backend.core.scope_validator import ScopeValidator
 from backend.services.request_engine import (
     MockTransport,

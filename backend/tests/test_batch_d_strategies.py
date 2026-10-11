@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 from unittest.mock import AsyncMock
+
 import pytest
 
+from backend.services.request_engine import RequestEngine, RequestEvidence
 from backend.services.verification_engine import (
     VerificationBudget,
     VerificationConclusion,
@@ -14,16 +16,31 @@ from backend.services.verification_engine import (
     VerificationRegistry,
     VerificationStatus,
 )
-from backend.services.request_engine import RequestEngine, RequestEvidence
-from backend.services.verification_strategies.http_request_smuggling_strategy import HttpRequestSmugglingVerificationStrategy
-from backend.services.verification_strategies.web_cache_poisoning_strategy import WebCachePoisoningVerificationStrategy
 from backend.services.verification_strategies.cswsh_strategy import CswshVerificationStrategy
-from backend.services.verification_strategies.host_header_injection_strategy import HostHeaderInjectionVerificationStrategy
-from backend.services.verification_strategies.graphql_batching_strategy import GraphqlBatchingVerificationStrategy
-from backend.services.verification_strategies.graphql_resolver_auth_strategy import GraphqlResolverAuthVerificationStrategy
-from backend.services.verification_strategies.oauth_redirect_uri_strategy import OAuthRedirectUriVerificationStrategy
-from backend.services.verification_strategies.oauth_state_parameter_strategy import OAuthStateParameterVerificationStrategy
-from backend.services.verification_strategies.insecure_deserialization_strategy import InsecureDeserializationVerificationStrategy
+from backend.services.verification_strategies.graphql_batching_strategy import (
+    GraphqlBatchingVerificationStrategy,
+)
+from backend.services.verification_strategies.graphql_resolver_auth_strategy import (
+    GraphqlResolverAuthVerificationStrategy,
+)
+from backend.services.verification_strategies.host_header_injection_strategy import (
+    HostHeaderInjectionVerificationStrategy,
+)
+from backend.services.verification_strategies.http_request_smuggling_strategy import (
+    HttpRequestSmugglingVerificationStrategy,
+)
+from backend.services.verification_strategies.insecure_deserialization_strategy import (
+    InsecureDeserializationVerificationStrategy,
+)
+from backend.services.verification_strategies.oauth_redirect_uri_strategy import (
+    OAuthRedirectUriVerificationStrategy,
+)
+from backend.services.verification_strategies.oauth_state_parameter_strategy import (
+    OAuthStateParameterVerificationStrategy,
+)
+from backend.services.verification_strategies.web_cache_poisoning_strategy import (
+    WebCachePoisoningVerificationStrategy,
+)
 
 
 def make_evidence(request_id: str, response_status: int, response_body: str, response_headers: dict | None = None, success: bool = True) -> RequestEvidence:

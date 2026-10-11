@@ -7,6 +7,7 @@ and guarantee strict ScopeValidator gating before any transport interaction.
 import asyncio
 import hashlib
 import time
+
 import pytest
 
 from backend.core.scope_validator import ScopeValidator

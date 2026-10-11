@@ -1,14 +1,16 @@
 """Parameter Tampering Verification Strategy."""
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+from backend.services.request_engine import RequestSpec, RequestTimeout
 from backend.services.verification_engine import (
-    VerificationStatus,
-    VerificationReasonCode,
-    VerificationConclusion,
     BaseVerificationStrategy,
+    VerificationConclusion,
     VerificationContext,
     VerificationContract,
+    VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.request_engine import RequestSpec, RequestTimeout
+
 
 class ParameterTamperingVerificationStrategy(BaseVerificationStrategy):
     contract = VerificationContract(

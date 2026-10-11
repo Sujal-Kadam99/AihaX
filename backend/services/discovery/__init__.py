@@ -1,13 +1,12 @@
 """Passive discovery and asset inventory services."""
 
+from backend.services.discovery.alienvault_provider import AlienVaultProvider
 from backend.services.discovery.base_provider import (
     BasePassiveProvider,
     DiscoveredItem,
     generate_passive_evidence_id,
 )
 from backend.services.discovery.crtsh_provider import CRTShProvider
-from backend.services.discovery.wayback_provider import WaybackProvider
-from backend.services.discovery.alienvault_provider import AlienVaultProvider
 from backend.services.discovery.dns_provider import DNSProvider
 from backend.services.discovery.normalizer import (
     AssetType,
@@ -17,6 +16,7 @@ from backend.services.discovery.normalizer import (
     normalize_query,
     normalize_url,
 )
+from backend.services.discovery.wayback_provider import WaybackProvider
 
 __all__ = [
     "BasePassiveProvider",

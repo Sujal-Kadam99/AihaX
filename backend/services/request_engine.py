@@ -34,7 +34,6 @@ from backend.core.scope_validator import (
     validate_destination_safety,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. DATA MODELS & DTOs
 # ──────────────────────────────────────────────────────────────────────────────
@@ -625,7 +624,7 @@ class RequestEngine:
         # 3. Prepare payload and headers
         headers, body_bytes, body_str = self._prepare_request_data(spec)
         request_hash = hashlib.sha256(
-            f"{method}:{current_url}:{body_str or ''}".encode("utf-8")
+            f"{method}:{current_url}:{body_str or ''}".encode()
         ).hexdigest()
 
         # 4. Request execution with bounded retries and redirect loops
@@ -824,7 +823,7 @@ class RequestEngine:
         """Construct evidence for a request blocked before transport."""
         headers, _, body_str = self._prepare_request_data(spec)
         request_hash = hashlib.sha256(
-            f"{spec.method.upper()}:{spec.url}:{body_str or ''}".encode("utf-8")
+            f"{spec.method.upper()}:{spec.url}:{body_str or ''}".encode()
         ).hexdigest()
 
         return RequestEvidence(

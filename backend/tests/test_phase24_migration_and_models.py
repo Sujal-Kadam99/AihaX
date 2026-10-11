@@ -2,22 +2,23 @@
 
 import json
 import uuid
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import sessionmaker
 
 from backend.models.database import (
+    AgentOrchestratorRunRecord,
+    AuthContextRecord,
     Base,
+    ExploitabilityRecord,
     PreScanResultRecord,
     ToolExecutionRecord,
-    AuthContextRecord,
-    ExploitabilityRecord,
-    AgentOrchestratorRunRecord,
     get_utc_now,
 )
-from backend.models.migrations import MIGRATIONS, run_migrations, _compute_checksum
+from backend.models.migrations import MIGRATIONS, _compute_checksum, run_migrations
 
 
 @pytest.fixture

@@ -1,7 +1,8 @@
 """End-to-End Runtime Truth & Verification Smoke Test for AihaX."""
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -194,7 +195,7 @@ def test_complete_e2e_campaign_lifecycle_and_runtime_truth(test_db_session, clie
     assert gen_resp.json()["success"] is True
     assert gen_resp.json()["verified_findings_count"] == 1
 
-    # ── Stage 9: Download PDF Report (GET /api/campaigns/{id}/reports/download) 
+    # ── Stage 9: Download PDF Report (GET /api/campaigns/{id}/reports/download)
     dl_resp = client.get(f"/api/campaigns/{campaign_id}/reports/download", headers=auth_headers)
     assert dl_resp.status_code == 200, dl_resp.text
     assert dl_resp.headers["content-type"] == "application/pdf"

@@ -33,7 +33,11 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
-from backend.core.scope_validator import ScopeValidator, normalize_domain, validate_destination_safety
+from backend.core.scope_validator import (
+    ScopeValidator,
+    normalize_domain,
+    validate_destination_safety,
+)
 from backend.execution.tool_execution_boundary import (
     ExecutionProfile,
     ToolExecutionBoundary,
@@ -816,7 +820,7 @@ class DNSProviderAdapter(BaseReconProvider):
                             status=ReconAssetStatus.IN_SCOPE,
                             is_executable=False,
                             metadata={"type": rec_type, "value": val, "hostname": domain},
-                            evidence_hash=hashlib.sha256(f"{rec_type}:{val}".encode("utf-8")).hexdigest(),
+                            evidence_hash=hashlib.sha256(f"{rec_type}:{val}".encode()).hexdigest(),
                         )
                     )
 
@@ -908,7 +912,7 @@ class DNSProviderAdapter(BaseReconProvider):
                         status=ReconAssetStatus.IN_SCOPE,
                         is_executable=False,
                         metadata={"type": rec_type, "value": val, "hostname": domain},
-                        evidence_hash=hashlib.sha256(f"{rec_type}:{val}".encode("utf-8")).hexdigest(),
+                        evidence_hash=hashlib.sha256(f"{rec_type}:{val}".encode()).hexdigest(),
                     )
                 )
 
@@ -1013,7 +1017,7 @@ class HttpProbeProvider(BaseReconProvider):
                     "headers": probe_res.headers,
                     "server": probe_res.server_banner,
                 },
-                evidence_hash=hashlib.sha256(f"{probe_res.status_code}:{probe_res.title}".encode("utf-8")).hexdigest(),
+                evidence_hash=hashlib.sha256(f"{probe_res.status_code}:{probe_res.title}".encode()).hexdigest(),
             )
 
             end_time = datetime.now(timezone.utc).isoformat()
@@ -1097,7 +1101,7 @@ class HttpProbeProvider(BaseReconProvider):
                 "server": probe_res.server_banner,
                 "redirect_chain": probe_res.redirect_chain,
             },
-            evidence_hash=hashlib.sha256(f"{probe_res.status_code}:{probe_res.title}".encode("utf-8")).hexdigest(),
+            evidence_hash=hashlib.sha256(f"{probe_res.status_code}:{probe_res.title}".encode()).hexdigest(),
         )
 
         end_time = datetime.now(timezone.utc).isoformat()
@@ -1165,7 +1169,7 @@ class TechnologyFingerprintProvider(BaseReconProvider):
                     status=ReconAssetStatus.IN_SCOPE,
                     is_executable=False,
                     metadata={"version": t.version, "category": t.category, "confidence": t.confidence.value},
-                    evidence_hash=hashlib.sha256(f"{t.name}:{t.version}".encode("utf-8")).hexdigest(),
+                    evidence_hash=hashlib.sha256(f"{t.name}:{t.version}".encode()).hexdigest(),
                 )
             )
 

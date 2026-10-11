@@ -463,8 +463,8 @@ def generate_markdown_report(scan_id: str, db: Session, mode: Optional[str] = "b
     target_obj = scan or campaign
     target_url = getattr(target_obj, "target_url", "N/A")
 
-    from backend.services.finding_quality import FindingQualityScorer
     from backend.services.finding_deduplicator import FindingDeduplicator
+    from backend.services.finding_quality import FindingQualityScorer
 
     raw_findings = (
         db.query(Finding)
@@ -625,7 +625,7 @@ def _format_finding_block(idx: int, f: Finding, q: Any, target_url: str) -> list
         "",
         "#### Steps to Reproduce",
         f"1. Dispatch authorized HTTP request matching the proof payload to `{f.affected_url}`.",
-        f"2. Observe server response containing verifiable security condition.",
+        "2. Observe server response containing verifiable security condition.",
         "",
         "#### Baseline Evidence",
         "```http",
@@ -819,7 +819,7 @@ def generate_phase23_report_package(
         f"- The application on `{target}` exhibited differential behavior confirming {vuln_class}.",
         "",
         "### Potential Impact ([INFERENCE])",
-        f"- [INFERENCE] An unauthorized attacker could potentially leverage this condition to access sensitive resources if additional access controls are missing.",
+        "- [INFERENCE] An unauthorized attacker could potentially leverage this condition to access sensitive resources if additional access controls are missing.",
         "",
         "## 7. Multi-Factor Confidence Assessment",
         f"- **Confidence Level:** **{conf_dict.get('confidence_level', 'HIGH')}**",

@@ -1,7 +1,8 @@
 """SQLAlchemy custom TypeDecorator for transparent AES-256-GCM column encryption."""
 
-from sqlalchemy.types import TypeDecorator, String
-from backend.core.encryption import encrypt_string, decrypt_string
+from sqlalchemy.types import String, TypeDecorator
+
+from backend.core.encryption import decrypt_string, encrypt_string
 
 
 class EncryptedText(TypeDecorator):

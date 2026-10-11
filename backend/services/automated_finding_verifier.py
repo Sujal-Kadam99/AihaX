@@ -205,7 +205,11 @@ class AutomatedFindingVerifier:
             cls._apply_finding_updates(finding, explanation, skeptic_claim=None, prosecutor_claim=None)
             return explanation
 
-        from backend.services.adversarial_judge import VerificationSkeptic, VerificationProsecutor, AdversarialJudge
+        from backend.services.adversarial_judge import (
+            AdversarialJudge,
+            VerificationProsecutor,
+            VerificationSkeptic,
+        )
 
         # 3. SKEPTIC GATE (Section 13)
         skeptic_claim, fp_result = VerificationSkeptic.evaluate(
@@ -479,7 +483,7 @@ class AutomatedFindingVerifier:
         # Inject historical signal to the explanation DTO if not already present
         if skeptic_claim and "Historical FP Match" in str(skeptic_claim.reasoning):
             if not any("HISTORICAL_FP_MATCH" in req for req in explanation.failed_requirements):
-                explanation.failed_requirements.append(f"HISTORICAL_FP_MATCH")
+                explanation.failed_requirements.append("HISTORICAL_FP_MATCH")
 
         finding.condition_confidence = explanation.condition_confidence
         finding.impact_confidence = explanation.impact_confidence

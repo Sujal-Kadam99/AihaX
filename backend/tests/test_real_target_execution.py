@@ -2,6 +2,7 @@
 
 import asyncio
 import socket
+
 import pytest
 from aiohttp import web
 
@@ -12,10 +13,20 @@ from backend.execution.canary import CanaryGenerator
 from backend.execution.differential import ReflectionContext, ResponseDifferentialEngine
 from backend.execution.mutation_engine import MutationStrategy, ParameterMutationEngine
 from backend.execution.parameter_discovery import ParameterDiscoveryEngine
-from backend.execution.parameter_model import DiscoveredParameter, ParameterLocation, ParameterSource, ParameterType
+from backend.execution.parameter_model import (
+    DiscoveredParameter,
+    ParameterLocation,
+    ParameterSource,
+    ParameterType,
+)
 from backend.recon.models import DiscoveredEndpoint, DiscoverySource, EndpointType
 from backend.services.campaign_executor import CampaignExecutor, CampaignMode, CampaignRequestBudget
-from backend.services.request_engine import AiohttpTransport, RequestEngine, RequestSpec, RequestTimeout
+from backend.services.request_engine import (
+    AiohttpTransport,
+    RequestEngine,
+    RequestSpec,
+    RequestTimeout,
+)
 from backend.tests.fixtures.security_lab.lab_server import create_security_lab_app
 
 

@@ -1,7 +1,9 @@
+import asyncio
 import json
 import logging
-import asyncio
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from backend.core.redis_client import subscribe_updates
 
 router = APIRouter(prefix="/ws", tags=["websocket"])

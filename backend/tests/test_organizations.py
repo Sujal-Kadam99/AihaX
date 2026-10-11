@@ -1,7 +1,7 @@
 """Team workspace membership, seat, and role enforcement tests."""
 
-from datetime import datetime, timedelta, timezone
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,7 +12,14 @@ from sqlalchemy.pool import StaticPool
 from backend.core.auth import get_current_user, get_current_user_optional, get_or_create_api_token
 from backend.core.entitlements import EntitlementManager, get_user_tier
 from backend.main import app
-from backend.models.database import Base, EntitlementCache, OrganizationMember, Subscription, User, get_db
+from backend.models.database import (
+    Base,
+    EntitlementCache,
+    OrganizationMember,
+    Subscription,
+    User,
+    get_db,
+)
 from backend.persistence.models import Campaign
 
 

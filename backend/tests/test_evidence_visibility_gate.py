@@ -27,6 +27,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from backend.agents.auth_agent import SharedAuthContext
 from backend.agents.recon_agent import ReconObservation, ReconObservationCategory, ReconSnapshot
@@ -35,7 +36,7 @@ from backend.evidence.evidence_store import EvidenceVault, VaultEvidenceEntry
 from backend.evidence.redaction import redact_secrets
 from backend.evidence.retrieval import EvidenceRetrievalService
 from backend.main import app
-from backend.models.database import Base, Finding
+from backend.models.database import Base, Finding, Scan
 from backend.persistence.models import (
     AuditTrailEvent,
     AuthorizationRecord,
@@ -43,8 +44,8 @@ from backend.persistence.models import (
     EvidenceRecord,
     ExecutionTask,
 )
-from backend.persistence.state_machine import TaskLifecycleState
 from backend.persistence.repository import CampaignRepository
+from backend.persistence.state_machine import TaskLifecycleState
 from backend.services.execution_events import (
     ExecutionEvent,
     ExecutionEventManager,
@@ -69,11 +70,6 @@ from backend.services.vulnerability_test_selector import (
     VulnerabilityTestMatrix,
     VulnerabilityTestSelector,
 )
-
-
-from sqlalchemy.pool import StaticPool
-from backend.models.database import Scan
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TEST FIXTURES

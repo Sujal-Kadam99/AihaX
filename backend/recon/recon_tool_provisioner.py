@@ -27,17 +27,17 @@ import ssl
 import tarfile
 import tempfile
 import urllib.request
-from urllib.parse import urlparse
 import zipfile
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from urllib.parse import urlparse
 
 from backend.execution.tool_execution_boundary import ToolExecutionBoundary
 from backend.models.database import get_utc_now
 from backend.recon.recon_tool_availability import (
+    TOOL_SPECS,
     ReconToolAvailability,
     ReconToolAvailabilityStatus,
-    TOOL_SPECS,
     ToolInventoryRecord,
 )
 

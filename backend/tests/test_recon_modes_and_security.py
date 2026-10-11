@@ -16,6 +16,7 @@ from __future__ import annotations
 import ast
 import inspect
 import json
+
 import pytest
 
 from backend.core.scope_validator import ScopeValidator
@@ -47,7 +48,6 @@ from backend.recon.recon_preflight import PreflightStatus, ReconPreflightGate
 from backend.recon.snapshot import CanonicalReconSnapshot
 from backend.services.request_engine import MockTransport, RequestEngine
 from backend.services.vulnerability_test_selector import VulnerabilityTestSelector
-
 
 # ==============================================================================
 # 1. Mandatory Security Tests (Tests A through K)

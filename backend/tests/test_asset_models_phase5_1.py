@@ -1,25 +1,26 @@
 """Unit & Integration tests for Phase 5.1-A Passive Recon Database Foundation."""
 
 import json
-import pytest
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, text, event
-from sqlalchemy.orm import sessionmaker
+
+import pytest
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import sessionmaker
 
 from backend.models.database import (
-    Base,
-    Program,
-    ProgramScope,
-    DiscoverySource,
     Asset,
     AssetObservation,
+    Base,
+    DiscoverySource,
     Endpoint,
+    Program,
+    ProgramScope,
     TechnologyFingerprint,
     get_utc_now,
 )
-from backend.models.migrations import run_migrations, MIGRATIONS
+from backend.models.migrations import MIGRATIONS, run_migrations
 
 
 @pytest.fixture

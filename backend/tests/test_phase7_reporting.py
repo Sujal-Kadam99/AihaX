@@ -1,8 +1,9 @@
 """AihaX Phase 7 — Bug Bounty Report Generator V2 Tests."""
 
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 
 
 def _make_finding(

@@ -9,25 +9,25 @@ Validates that:
 6. CampaignCoverageReport assertions work correctly.
 """
 
-import pytest
 from datetime import datetime, timezone
 
-from backend.services.coverage_validator import (
-    CampaignCoverageReport,
-    CheckCoverageRecord,
-    CheckExecutionStatus,
-    CoverageValidator,
-)
+import pytest
+
 import backend.agents.checks  # Ensure all 77 checks are loaded
 from backend.core.check_registry import registry
+from backend.models.database import Finding
 from backend.services.campaign_executor import (
     AUTHENTICATION_REQUIRED_CHECKS,
     BROWSER_REQUIRED_CHECKS,
     WORKFLOW_REQUIRED_CHECKS,
     CampaignResult,
 )
-from backend.models.database import Finding
-
+from backend.services.coverage_validator import (
+    CampaignCoverageReport,
+    CheckCoverageRecord,
+    CheckExecutionStatus,
+    CoverageValidator,
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. Registry Completeness Tests

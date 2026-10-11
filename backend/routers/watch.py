@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.database import WatchSchedule, get_db
 from backend.models.schemas import WatchScheduleItem, WatchSchedulePayload
-from backend.services.watch_scheduler import schedule_watch_job, cancel_watch_job
+from backend.services.watch_scheduler import cancel_watch_job, schedule_watch_job
 
 router = APIRouter(prefix="/api/watch", tags=["watch"])
 

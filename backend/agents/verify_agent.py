@@ -92,6 +92,7 @@ class VerifyAgent(BaseAgent):
 
     def _extract_auth_context(self) -> Optional[AuthenticationContext]:
         import json as _json
+
         from backend.models.database import AuthContextRecord
         cookies: dict[str, str] = {}
         try:

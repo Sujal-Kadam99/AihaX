@@ -266,9 +266,9 @@ class ReconAgent(BaseAgent):
             "domain": normalize_hostname(target_url),
             "subdomains": [o.normalized_value for o in snapshot.observations if o.category == ReconObservationCategory.SUBDOMAIN.value],
             "endpoints": [
-                o.normalized_value for o in snapshot.observations 
+                o.normalized_value for o in snapshot.observations
                 if o.category in (
-                    ReconObservationCategory.ENDPOINT.value, 
+                    ReconObservationCategory.ENDPOINT.value,
                     ReconObservationCategory.HISTORICAL_URL.value,
                     ReconObservationCategory.DIRECTORY.value,
                     ReconObservationCategory.FILE.value,

@@ -4,15 +4,15 @@ Tries a small fixed list of well-known default credential pairs against
 a login endpoint and checks for successful authentication responses.
 """
 
+from backend.services.request_engine import RequestSpec, RequestTimeout
 from backend.services.verification_engine import (
-    VerificationStatus,
-    VerificationReasonCode,
-    VerificationConclusion,
     BaseVerificationStrategy,
+    VerificationConclusion,
     VerificationContext,
     VerificationContract,
+    VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.request_engine import RequestSpec, RequestTimeout
 
 
 class DefaultCredentialsVerificationStrategy(BaseVerificationStrategy):

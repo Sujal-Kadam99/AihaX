@@ -191,7 +191,7 @@ class ManifestBuilder:
         elif auth.status != "ACTIVE" or (auth.expires_at and auth.expires_at < datetime.now(timezone.utc)):
             passed = False
             details = f"Authorization is {auth.status} or expired at {auth.expires_at}"
-            issues.append(f"Authorization invalid or expired.")
+            issues.append("Authorization invalid or expired.")
         else:
             passed = True
             details = f"Active authorization verified (authorized by {auth.authorized_by})"

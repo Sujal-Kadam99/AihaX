@@ -44,9 +44,9 @@ from backend.recon.live_recon_validator import (
 )
 from backend.recon.recon_modes import ReconAssetStatus, ReconExecutionMode
 from backend.recon.recon_tool_availability import (
+    TOOL_SPECS,
     ReconToolAvailability,
     ReconToolAvailabilityStatus,
-    TOOL_SPECS,
     ToolDiagnosticResult,
     ToolInventoryRecord,
 )
@@ -59,7 +59,6 @@ from backend.recon.recon_tool_provisioner import (
 )
 from backend.recon.snapshot import CanonicalReconSnapshot
 from backend.services.attack_surface_graph import AttackSurfaceGraphEngine
-
 
 # ==============================================================================
 # In-Memory DB Fixture

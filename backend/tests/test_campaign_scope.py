@@ -1,6 +1,7 @@
 """Tests for Campaign Scope Enforcement and Default-Deny Security Invariants."""
 
 import pytest
+
 from backend.core.scope_validator import ScopeValidator
 from backend.services.campaign_executor import AssetNormalizer, CampaignExecutor
 from backend.services.request_engine import (

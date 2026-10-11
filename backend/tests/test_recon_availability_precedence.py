@@ -1,7 +1,10 @@
 import os
 from unittest import mock
+
 import pytest
-from backend.recon.recon_tool_availability import ReconToolAvailability, DEFAULT_PROJECT_TOOLS_DIR
+
+from backend.recon.recon_tool_availability import DEFAULT_PROJECT_TOOLS_DIR, ReconToolAvailability
+
 
 @pytest.fixture
 def clean_env():

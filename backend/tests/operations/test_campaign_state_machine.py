@@ -1,6 +1,7 @@
 """AihaX Phase 8 — Campaign State Machine Unit Tests."""
 
 import pytest
+
 from backend.persistence.state_machine import (
     CampaignLifecycleState,
     CampaignStateMachine,

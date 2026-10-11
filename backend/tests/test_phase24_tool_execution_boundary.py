@@ -3,6 +3,7 @@
 import asyncio
 import inspect
 import json
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -455,6 +456,7 @@ class TestStaticSecurityChecks:
 
     def test_no_forbidden_constructs_in_boundary_code(self):
         import ast
+
         import backend.execution.tool_execution_boundary as module
 
         source = inspect.getsource(module)
