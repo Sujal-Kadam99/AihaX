@@ -25,7 +25,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from backend.core.scope_validator import ScopeValidator
-from backend.models.database import Finding, FindingDisposition, BountyEligibility
+from backend.models.database import BountyEligibility, Finding, FindingDisposition
 from backend.services.request_engine import (
     AuthenticationContext,
     RequestEngine,
@@ -490,7 +490,6 @@ class VerificationRegistry:
         "C086_Insecure_Deserialization_Indicators": "C086_Insecure_Deserialization_Indicators",
         "insecure_deserialization": "C086_Insecure_Deserialization_Indicators",
         "Insecure Transport": "transport_security",
-        "Insecure Transport Configuration": "transport_security",
         "transport_security": "transport_security",
         "Security Misconfiguration": "http_response_property",
         "Information Disclosure": "sensitive_file_exposure",
@@ -590,7 +589,9 @@ class GenericReproducibilityStrategy(BaseVerificationStrategy):
         from pathlib import Path
         sys.path.append(str(Path(__file__).parent.parent.parent))
         try:
-            from backend.services.verification_strategies.request_builder import build_injected_request
+            from backend.services.verification_strategies.request_builder import (
+                build_injected_request,
+            )
             spec = build_injected_request(candidate, payload)
         except Exception as e:
             print(f"Exception in build_injected_request: {e}")
@@ -1807,38 +1808,86 @@ VerificationRegistry.register(GraphqlIntrospectionStrategy)
 VerificationRegistry.register(DirectoryListingStrategy)
 VerificationRegistry.register(OpenRedirectStrategy)
 VerificationRegistry.register(SubdomainTakeoverStrategy)
-from backend.services.verification_strategies.sql_injection_strategy import SqlInjectionVerificationStrategy
-from backend.services.verification_strategies.blind_sql_injection_strategy import BlindSqlInjectionVerificationStrategy
-from backend.services.verification_strategies.command_injection_strategy import CommandInjectionVerificationStrategy
-from backend.services.verification_strategies.open_redirect_strategy import OpenRedirectVerificationStrategy
-from backend.services.verification_strategies.csrf_strategy import CsrfVerificationStrategy
+from backend.services.verification_strategies.blind_sql_injection_strategy import (
+    BlindSqlInjectionVerificationStrategy,
+)
+from backend.services.verification_strategies.command_injection_strategy import (
+    CommandInjectionVerificationStrategy,
+)
 from backend.services.verification_strategies.cors_strategy import CorsVerificationStrategy
-from backend.services.verification_strategies.jwt_strategy import JwtVerificationStrategy
-from backend.services.verification_strategies.file_upload_strategy import FileUploadVerificationStrategy
-from backend.services.verification_strategies.xxe_strategy import XxeVerificationStrategy
-from backend.services.verification_strategies.directory_listing_strategy import DirectoryListingVerificationStrategy
-from backend.services.verification_strategies.verbose_error_strategy import VerboseErrorVerificationStrategy
-from backend.services.verification_strategies.default_credentials_strategy import DefaultCredentialsVerificationStrategy
-from backend.services.verification_strategies.mass_assignment_strategy import MassAssignmentVerificationStrategy
-from backend.services.verification_strategies.parameter_tampering_strategy import ParameterTamperingVerificationStrategy
-from backend.services.verification_strategies.race_condition_strategy import RaceConditionVerificationStrategy
-from backend.services.verification_strategies.xss_strategy import XssVerificationStrategy
-from backend.services.verification_strategies.http_request_smuggling_strategy import HttpRequestSmugglingVerificationStrategy
-from backend.services.verification_strategies.web_cache_poisoning_strategy import WebCachePoisoningVerificationStrategy
+from backend.services.verification_strategies.csrf_strategy import CsrfVerificationStrategy
 from backend.services.verification_strategies.cswsh_strategy import CswshVerificationStrategy
-from backend.services.verification_strategies.host_header_injection_strategy import HostHeaderInjectionVerificationStrategy
-from backend.services.verification_strategies.graphql_batching_strategy import GraphqlBatchingVerificationStrategy
-from backend.services.verification_strategies.graphql_resolver_auth_strategy import GraphqlResolverAuthVerificationStrategy
-from backend.services.verification_strategies.oauth_redirect_uri_strategy import OAuthRedirectUriVerificationStrategy
-from backend.services.verification_strategies.oauth_state_parameter_strategy import OAuthStateParameterVerificationStrategy
-from backend.services.verification_strategies.insecure_deserialization_strategy import InsecureDeserializationVerificationStrategy
+from backend.services.verification_strategies.default_credentials_strategy import (
+    DefaultCredentialsVerificationStrategy,
+)
+from backend.services.verification_strategies.directory_listing_strategy import (
+    DirectoryListingVerificationStrategy,
+)
+from backend.services.verification_strategies.expression_language_strategy import (
+    ExpressionLanguageVerificationStrategy,
+)
+from backend.services.verification_strategies.file_upload_strategy import (
+    FileUploadVerificationStrategy,
+)
+from backend.services.verification_strategies.graphql_batching_strategy import (
+    GraphqlBatchingVerificationStrategy,
+)
+from backend.services.verification_strategies.graphql_resolver_auth_strategy import (
+    GraphqlResolverAuthVerificationStrategy,
+)
+from backend.services.verification_strategies.host_header_injection_strategy import (
+    HostHeaderInjectionVerificationStrategy,
+)
+from backend.services.verification_strategies.http_request_smuggling_strategy import (
+    HttpRequestSmugglingVerificationStrategy,
+)
+from backend.services.verification_strategies.insecure_deserialization_strategy import (
+    InsecureDeserializationVerificationStrategy,
+)
+from backend.services.verification_strategies.jwt_strategy import JwtVerificationStrategy
+from backend.services.verification_strategies.ldap_injection_strategy import (
+    LdapInjectionVerificationStrategy,
+)
+from backend.services.verification_strategies.local_file_inclusion_strategy import (
+    LocalFileInclusionStrategy,
+)
+from backend.services.verification_strategies.mass_assignment_strategy import (
+    MassAssignmentVerificationStrategy,
+)
+from backend.services.verification_strategies.nosql_injection_strategy import (
+    NosqlInjectionVerificationStrategy,
+)
+from backend.services.verification_strategies.oauth_redirect_uri_strategy import (
+    OAuthRedirectUriVerificationStrategy,
+)
+from backend.services.verification_strategies.oauth_state_parameter_strategy import (
+    OAuthStateParameterVerificationStrategy,
+)
+from backend.services.verification_strategies.open_redirect_strategy import (
+    OpenRedirectVerificationStrategy,
+)
+from backend.services.verification_strategies.parameter_tampering_strategy import (
+    ParameterTamperingVerificationStrategy,
+)
+from backend.services.verification_strategies.path_traversal_strategy import (
+    PathTraversalVerificationStrategy,
+)
+from backend.services.verification_strategies.race_condition_strategy import (
+    RaceConditionVerificationStrategy,
+)
+from backend.services.verification_strategies.sql_injection_strategy import (
+    SqlInjectionVerificationStrategy,
+)
 from backend.services.verification_strategies.ssrf_strategy import SsrfVerificationStrategy
 from backend.services.verification_strategies.ssti_strategy import SstiVerificationStrategy
-from backend.services.verification_strategies.nosql_injection_strategy import NosqlInjectionVerificationStrategy
-from backend.services.verification_strategies.path_traversal_strategy import PathTraversalVerificationStrategy
-from backend.services.verification_strategies.local_file_inclusion_strategy import LocalFileInclusionStrategy
-from backend.services.verification_strategies.ldap_injection_strategy import LdapInjectionVerificationStrategy
-from backend.services.verification_strategies.expression_language_strategy import ExpressionLanguageVerificationStrategy
+from backend.services.verification_strategies.verbose_error_strategy import (
+    VerboseErrorVerificationStrategy,
+)
+from backend.services.verification_strategies.web_cache_poisoning_strategy import (
+    WebCachePoisoningVerificationStrategy,
+)
+from backend.services.verification_strategies.xss_strategy import XssVerificationStrategy
+from backend.services.verification_strategies.xxe_strategy import XxeVerificationStrategy
 
 VerificationRegistry.register(SqlInjectionVerificationStrategy)
 VerificationRegistry.register(BlindSqlInjectionVerificationStrategy)
@@ -1879,8 +1928,6 @@ VerificationRegistry.register(ExpressionLanguageVerificationStrategy)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class VerificationEngine:
-    def _get_strategy_factory(self):
-                return StrategyFactory
     """Central deterministic verification orchestrator."""
 
     def __init__(self, registry: Optional[Type[VerificationRegistry]] = None) -> None:
