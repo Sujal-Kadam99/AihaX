@@ -1,7 +1,8 @@
 """AihaX Phase 7 — Unit tests for EvidenceCorrelator, FindingClusterer, and RemediationEngine."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 def _make_finding(
@@ -154,7 +155,7 @@ class TestEvidenceCorrelator:
 class TestFindingClusterer:
 
     def test_exact_duplicate_clustered(self):
-        from backend.intelligence.finding_clusterer import FindingClusterer, ClusterRelationType
+        from backend.intelligence.finding_clusterer import ClusterRelationType, FindingClusterer
         f1 = _make_finding(id_="find-001", affected_url="http://testsite.com/search")
         f2 = _make_finding(id_="find-002", affected_url="http://testsite.com/search")  # Same URL
         clusters = FindingClusterer.cluster_findings([f1, f2])
@@ -184,7 +185,7 @@ class TestFindingClusterer:
             assert "EVD-002" in all_ev
 
     def test_single_finding_is_independent(self):
-        from backend.intelligence.finding_clusterer import FindingClusterer, ClusterRelationType
+        from backend.intelligence.finding_clusterer import ClusterRelationType, FindingClusterer
         f = _make_finding()
         clusters = FindingClusterer.cluster_findings([f])
         assert len(clusters) == 1

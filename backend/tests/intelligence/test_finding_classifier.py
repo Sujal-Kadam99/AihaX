@@ -1,7 +1,8 @@
 """AihaX Phase 7 — Unit tests for FindingClassifier."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 def _make_finding(

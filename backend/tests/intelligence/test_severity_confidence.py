@@ -1,7 +1,8 @@
 """AihaX Phase 7 — Unit tests for SeverityEngine and ConfidenceEngine."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 def _make_finding(
@@ -36,14 +37,14 @@ def _make_finding(
 class TestSeverityEngine:
 
     def test_sql_injection_minimum_high(self):
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(vuln_type="C023_SQL_Injection", severity="medium")
         result = SeverityEngine.assess(finding)
         # C023 has a floor of HIGH
         assert result.severity in (Severity.HIGH, Severity.CRITICAL)
 
     def test_command_injection_critical(self):
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(
             vuln_type="C027_OS_Command_Injection",
             severity="critical",
@@ -53,7 +54,7 @@ class TestSeverityEngine:
         assert result.severity == Severity.CRITICAL
 
     def test_info_check_low_by_default(self):
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(
             vuln_type="C001_Open_Port",
             severity="info",
@@ -76,7 +77,7 @@ class TestSeverityEngine:
         assert result.factors is not None
 
     def test_safe_encoding_reduces_severity(self):
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(
             vuln_type="C037_Reflected_XSS",
             severity="high",
@@ -87,7 +88,7 @@ class TestSeverityEngine:
         assert result.score < 70  # Significant reduction from encoding penalty
 
     def test_passive_only_reduces_severity(self):
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(
             vuln_type="C001_Open_Port",
             severity="info",
@@ -116,7 +117,7 @@ class TestSeverityEngine:
 
     def test_severity_independent_from_confidence(self):
         """High severity with low confidence must be valid."""
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(
             vuln_type="C023_SQL_Injection",
             severity="high",
@@ -140,13 +141,21 @@ class TestSeverityEngine:
 class TestConfidenceEngine:
 
     def test_candidate_only_low_confidence(self):
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
         signals = ConfidenceSignals()  # No positive signals
         result = ConfidenceEngine.assess(signals)
         assert result.level == ConfidenceLevel.LOW
 
     def test_reproduced_high_confidence(self):
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
         signals = ConfidenceSignals(
             deterministically_reproduced=True,
             negative_control_passed=True,
@@ -160,7 +169,11 @@ class TestConfidenceEngine:
         assert result.score >= 50  # At minimum MEDIUM territory
 
     def test_full_verification_certain(self):
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
         signals = ConfidenceSignals(
             deterministically_reproduced=True,
             math_canary_confirmed=True,
@@ -178,7 +191,11 @@ class TestConfidenceEngine:
         assert result.score >= 90
 
     def test_heuristic_only_capped_at_medium(self):
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
         signals = ConfidenceSignals(
             heuristic_only=True,
             deterministically_reproduced=False,
@@ -188,14 +205,22 @@ class TestConfidenceEngine:
         assert result.score <= 45  # Capped at MEDIUM floor
 
     def test_passive_observation_capped(self):
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
         signals = ConfidenceSignals(passive_observation_only=True)
         result = ConfidenceEngine.assess(signals)
         assert result.score <= 40
 
     def test_duplicate_heuristics_no_inflation(self):
         """Multiple identical heuristic observations must not inflate beyond MEDIUM."""
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
         # Even 10 independent paths if all are heuristic must be capped
         signals = ConfidenceSignals(
             heuristic_only=True,
