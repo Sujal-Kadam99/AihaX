@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from backend.services.orchestrator import _run_with_retry
+
+import pytest
+
 from backend.agents.base_agent import BaseAgent, ScanCancelledException
+from backend.services.orchestrator import _run_with_retry
+
 
 class DummyAgent(BaseAgent):
     def __init__(self, should_fail_times=0):

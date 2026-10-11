@@ -47,7 +47,11 @@ from backend.core.check_registry import (
     Severity,
     registry,
 )
-from backend.core.scope_validator import ScopeValidator, validate_concrete_target_url, validate_destination_safety
+from backend.core.scope_validator import (
+    ScopeValidator,
+    validate_concrete_target_url,
+    validate_destination_safety,
+)
 from backend.evidence.evidence_store import EvidenceVault
 from backend.models.database import Base, Finding, Program, ProgramScope, Scan
 from backend.persistence.models import (

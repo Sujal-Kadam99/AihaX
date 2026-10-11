@@ -7,6 +7,7 @@ verdicts, and non-destructive execution.
 
 import asyncio
 import json
+
 import pytest
 
 from backend.core.scope_validator import ScopeValidator

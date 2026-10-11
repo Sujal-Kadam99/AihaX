@@ -1,15 +1,16 @@
 """Integration tests for Campaign Execution Orchestrator with Security Lab."""
 
-import pytest
 import aiohttp
+import pytest
 from aiohttp import web
+
 from backend.core.scope_validator import ScopeValidator
 from backend.services.campaign_executor import (
     AssetNormalizer,
     CampaignExecutor,
     Capability,
-    CheckPlanStatus,
     CheckPlanner,
+    CheckPlanStatus,
 )
 from backend.services.request_engine import (
     AiohttpTransport,

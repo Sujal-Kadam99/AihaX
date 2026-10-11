@@ -1,5 +1,7 @@
 import pytest
+
 from backend.recon.recon_tool_availability import ReconToolAvailability, ReconToolAvailabilityStatus
+
 
 @pytest.mark.asyncio
 async def test_internal_adapters_recognized():

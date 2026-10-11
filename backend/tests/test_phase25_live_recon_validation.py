@@ -31,9 +31,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import pytest
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from backend.core.scope_validator import ScopeValidator
 from backend.execution.tool_execution_boundary import (
@@ -49,13 +50,12 @@ from backend.recon.live_recon_validator import (
     ReconLifecycleEvent,
     ToolExecutionRecord,
     ToolValidationStatus,
-    select_service_scan_ports,
     compress_nmap_port_list,
+    select_service_scan_ports,
 )
 from backend.recon.recon_modes import ReconAssetStatus, ReconExecutionMode
 from backend.recon.snapshot import CanonicalReconSnapshot
 from backend.services.request_engine import MockTransport, RequestEngine
-
 
 # ==============================================================================
 # SECTION 1: UNIT TESTS

@@ -12,8 +12,9 @@ Tests the anti-hallucination guards (Section 16 of the Phase 7 spec) including:
 - 77-check registry integrity
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 def _make_finding(
@@ -225,7 +226,7 @@ class TestSecretsInReports:
         assert pkg.sanitized is True
 
     def test_contains_secrets_detection(self):
-        from backend.intelligence.reproducibility import ReproductionPackage, ReproducibilityEngine
+        from backend.intelligence.reproducibility import ReproducibilityEngine, ReproductionPackage
         pkg = ReproducibilityEngine.generate(_make_finding())
         # Since proof_request has no raw JWT, should not detect secrets
         # (our fixture proof_request is simple GET without real JWT)
@@ -236,8 +237,12 @@ class TestSeverityConfidenceIndependence:
 
     def test_high_severity_low_confidence_valid(self):
         """Severity=HIGH, Confidence=LOW must be a valid state."""
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(vuln_type="C023_SQL_Injection", severity="high", confidence=20)
         sev = SeverityEngine.assess(finding)
         signals = ConfidenceSignals(heuristic_only=True)
@@ -248,8 +253,12 @@ class TestSeverityConfidenceIndependence:
 
     def test_info_severity_high_confidence_valid(self):
         """INFO severity with HIGH confidence is valid (e.g., definitively confirmed minor issue)."""
-        from backend.intelligence.severity_engine import SeverityEngine, Severity
-        from backend.intelligence.confidence_engine import ConfidenceEngine, ConfidenceLevel, ConfidenceSignals
+        from backend.intelligence.confidence_engine import (
+            ConfidenceEngine,
+            ConfidenceLevel,
+            ConfidenceSignals,
+        )
+        from backend.intelligence.severity_engine import Severity, SeverityEngine
         finding = _make_finding(vuln_type="C001_Open_Port", severity="info", confidence=90)
         sev = SeverityEngine.assess(finding)
         signals = ConfidenceSignals(

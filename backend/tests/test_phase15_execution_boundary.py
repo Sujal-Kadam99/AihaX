@@ -70,7 +70,6 @@ from backend.services.request_engine import (
     TransportError,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Strict Zero-Network Sentinel Transport
 # ──────────────────────────────────────────────────────────────────────────────
@@ -201,7 +200,7 @@ def test_static_network_bypass_scan_all_checks():
     assert len(py_files) == 86, f"Expected 86 check source files, found {len(py_files)}"
 
     for py_path in py_files:
-        with open(py_path, "r", encoding="utf-8") as f:
+        with open(py_path, encoding="utf-8") as f:
             source = f.read()
 
         tree = ast.parse(source, filename=str(py_path))

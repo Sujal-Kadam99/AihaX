@@ -45,11 +45,11 @@ from backend.persistence.models import (
     Campaign,
     ExecutionTask,
 )
+from backend.persistence.repository import CampaignRepository
 from backend.persistence.state_machine import (
     CampaignLifecycleState,
     TaskLifecycleState,
 )
-from backend.persistence.repository import CampaignRepository
 from backend.services.campaign_operations import (
     AuthorizationRequiredException,
     CampaignOperationsService,
@@ -59,7 +59,6 @@ from backend.services.campaign_operations import (
 from backend.services.campaign_worker import CampaignWorker
 from backend.services.request_engine import RequestEngine
 from backend.services.verification_engine import VerificationEngine, VerificationStatus
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FIXTURES

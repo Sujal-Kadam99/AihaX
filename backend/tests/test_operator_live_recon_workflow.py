@@ -11,18 +11,24 @@ Verifies:
 from __future__ import annotations
 
 import json
-import pytest
 import socket
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from backend.core.auth import get_current_user_optional, get_or_create_api_token
 from backend.main import app
 from backend.models.database import Base, get_db
-from backend.persistence.models import AuthorizationRecord, Campaign, AuditTrailEvent, EvidenceRecord
-from backend.core.auth import get_current_user_optional, get_or_create_api_token
+from backend.persistence.models import (
+    AuditTrailEvent,
+    AuthorizationRecord,
+    Campaign,
+    EvidenceRecord,
+)
 
 client = TestClient(app)
 
@@ -68,6 +74,7 @@ def test_live_preflight_never_generates_network_traffic(db_session, monkeypatch)
         pytest.fail("Outbound external network call attempted during read-only preflight evaluation!")
 
     import urllib.request
+
     import requests
 
     monkeypatch.setattr(urllib.request, "urlopen", _forbidden_outbound)
@@ -222,6 +229,7 @@ async def test_live_recon_requires_all_operator_confirmations(db_session):
 @pytest.mark.asyncio
 async def test_live_recon_enables_only_operator_selected_active_capabilities(db_session, monkeypatch):
     from types import SimpleNamespace
+
     from backend.services import operator_live_recon_service as service_module
 
     campaign = Campaign(

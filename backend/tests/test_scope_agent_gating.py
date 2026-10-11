@@ -1,6 +1,7 @@
 """Regression tests proving ScopeAgent blocks scans when unauthorized or out-of-scope."""
 
 import json
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

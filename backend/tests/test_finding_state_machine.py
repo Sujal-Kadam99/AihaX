@@ -1,6 +1,7 @@
 """Tests for Finding Lifecycle State Machine and Immutability."""
 
 import pytest
+
 from backend.models.database import Finding
 from backend.services.finding_deduplicator import (
     EvidenceHasher,

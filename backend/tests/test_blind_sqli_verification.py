@@ -1,14 +1,19 @@
-import pytest
 import time
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from backend.services.request_engine import RequestEvidence, RequestSpec
 from backend.services.verification_engine import (
-    VerificationContext,
-    VerificationStatus,
-    VerificationReasonCode,
     VerificationBudget,
+    VerificationContext,
+    VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.verification_strategies.blind_sql_injection_strategy import BlindSqlInjectionVerificationStrategy
-from backend.services.request_engine import RequestSpec, RequestEvidence
+from backend.services.verification_strategies.blind_sql_injection_strategy import (
+    BlindSqlInjectionVerificationStrategy,
+)
+
 
 def create_context(mock_send_func) -> VerificationContext:
     context = VerificationContext(

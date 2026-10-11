@@ -1,12 +1,17 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from backend.services.request_engine import RequestEvidence, RequestSpec
 from backend.services.verification_engine import (
     VerificationContext,
-    VerificationStatus,
     VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.verification_strategies.command_injection_strategy import CommandInjectionVerificationStrategy
-from backend.services.request_engine import RequestSpec, RequestEvidence
+from backend.services.verification_strategies.command_injection_strategy import (
+    CommandInjectionVerificationStrategy,
+)
+
 
 def create_context(mock_send_func) -> VerificationContext:
     context = VerificationContext(

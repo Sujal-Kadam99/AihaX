@@ -3,10 +3,14 @@
 import json
 import uuid
 from datetime import datetime, timezone
-import pytest
 
-from backend.core.scope_validator import ScopeValidator, ScopeStatus
-from backend.evidence.integrity import compute_evidence_content_hash, compute_evidence_chain_hash
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from backend.core.scope_validator import ScopeStatus, ScopeValidator
+from backend.evidence.integrity import compute_evidence_chain_hash, compute_evidence_content_hash
 from backend.evidence.redaction import contains_unredacted_secrets, redact_secrets
 from backend.persistence.models import Base
 from backend.persistence.repository import CampaignRepository
@@ -19,9 +23,6 @@ from backend.services.request_engine import (
     RequestEngine,
     RequestSpec,
 )
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture

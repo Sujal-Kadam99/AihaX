@@ -13,9 +13,11 @@ Validates Phase 6 objectives:
 
 import asyncio
 import socket
+
 import pytest
 from aiohttp import web
 
+import backend.agents.checks  # Ensure all 77 checks are loaded
 from backend.core.check_registry import registry
 from backend.core.scope_validator import ScopeValidator
 from backend.services.campaign_executor import (
@@ -31,7 +33,6 @@ from backend.services.coverage_validator import (
 )
 from backend.services.request_engine import AiohttpTransport
 from backend.tests.fixtures.security_lab.lab_server import create_security_lab_app
-import backend.agents.checks  # Ensure all 77 checks are loaded
 
 
 def get_free_port() -> int:
@@ -319,7 +320,7 @@ async def test_coverage_report_all_records_have_required_fields(live_lab_server)
 
     for record in coverage.records:
         # Every record must have basic identity fields
-        assert record.check_id, f"Record missing check_id"
+        assert record.check_id, "Record missing check_id"
         assert record.name, f"Record {record.check_id} missing name"
         assert record.category, f"Record {record.check_id} missing category"
         assert record.severity, f"Record {record.check_id} missing severity"

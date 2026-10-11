@@ -1,19 +1,23 @@
-import pytest
 import re
 from unittest.mock import AsyncMock, patch
 
-from backend.services.verification_engine import (
-    VerificationContext,
-    VerificationBudget,
-    VerificationStatus,
-    VerificationReasonCode,
-)
+import pytest
+
 from backend.services.request_engine import RequestEngine, RequestEvidence
-from backend.services.verification_strategies.csrf_strategy import CsrfVerificationStrategy
+from backend.services.verification_engine import (
+    VerificationBudget,
+    VerificationContext,
+    VerificationReasonCode,
+    VerificationStatus,
+)
 from backend.services.verification_strategies.cors_strategy import CorsVerificationStrategy
+from backend.services.verification_strategies.csrf_strategy import CsrfVerificationStrategy
+from backend.services.verification_strategies.file_upload_strategy import (
+    FileUploadVerificationStrategy,
+)
 from backend.services.verification_strategies.jwt_strategy import JwtVerificationStrategy
-from backend.services.verification_strategies.file_upload_strategy import FileUploadVerificationStrategy
 from backend.services.verification_strategies.xxe_strategy import XxeVerificationStrategy
+
 
 @pytest.fixture
 def mock_request_engine():
@@ -40,7 +44,7 @@ async def test_csrf_strategy_verified(mock_request_engine, mock_budget):
     
     mock_response = RequestEvidence(
         request_id="r1", timestamp="ts", method="POST", url="u", request_headers={},
-        request_body=None, response_status=200, response_headers={}, 
+        request_body=None, response_status=200, response_headers={},
         response_body="OK", response_size=2, duration_ms=10.0, truncated=False,
         redirect_chain=[], scope_decision={}, transport_error=None, request_hash="",
         response_hash="", success=True
@@ -69,8 +73,8 @@ async def test_cors_strategy_verified(mock_request_engine, mock_budget):
     
     mock_response = RequestEvidence(
         request_id="r1", timestamp="ts", method="POST", url="u", request_headers={},
-        request_body=None, response_status=200, 
-        response_headers={"Access-Control-Allow-Origin": "https://malicious-aihax-test.com", "Access-Control-Allow-Credentials": "true"}, 
+        request_body=None, response_status=200,
+        response_headers={"Access-Control-Allow-Origin": "https://malicious-aihax-test.com", "Access-Control-Allow-Credentials": "true"},
         response_body="OK", response_size=2, duration_ms=10.0, truncated=False,
         redirect_chain=[], scope_decision={}, transport_error=None, request_hash="",
         response_hash="", success=True
@@ -98,7 +102,7 @@ async def test_jwt_strategy_verified(mock_request_engine, mock_budget):
     
     mock_response = RequestEvidence(
         request_id="r1", timestamp="ts", method="POST", url="u", request_headers={},
-        request_body=None, response_status=200, response_headers={}, 
+        request_body=None, response_status=200, response_headers={},
         response_body="OK", response_size=2, duration_ms=10.0, truncated=False,
         redirect_chain=[], scope_decision={}, transport_error=None, request_hash="",
         response_hash="", success=True
@@ -131,7 +135,7 @@ async def test_file_upload_strategy_verified(mock_request_engine, mock_budget):
             fname = m.group(1) if m else "test.php"
             return RequestEvidence(
                 request_id="r1", timestamp="ts", method="POST", url="u", request_headers={},
-                request_body=None, response_status=200, response_headers={}, 
+                request_body=None, response_status=200, response_headers={},
                 response_body=f'{{"url": "http://example.com/uploads/{fname}"}}', response_size=10, duration_ms=10.0, truncated=False,
                 redirect_chain=[], scope_decision={}, transport_error=None, request_hash="",
                 response_hash="", success=True
@@ -142,7 +146,7 @@ async def test_file_upload_strategy_verified(mock_request_engine, mock_budget):
             uuid_str = m.group(1) if m else "123"
             return RequestEvidence(
                 request_id="r2", timestamp="ts", method="POST", url="u", request_headers={},
-                request_body=None, response_status=200, response_headers={}, 
+                request_body=None, response_status=200, response_headers={},
                 response_body=f"AihaX_Upload_Test_{uuid_str}", response_size=10, duration_ms=10.0, truncated=False,
                 redirect_chain=[], scope_decision={}, transport_error=None, request_hash="",
                 response_hash="", success=True
@@ -169,7 +173,7 @@ async def test_xxe_strategy_verified(mock_request_engine, mock_budget):
     
     mock_response = RequestEvidence(
         request_id="r1", timestamp="ts", method="POST", url="u", request_headers={},
-        request_body=None, response_status=200, response_headers={}, 
+        request_body=None, response_status=200, response_headers={},
         response_body="root:x:0:0:root:/root:/bin/bash", response_size=30, duration_ms=10.0, truncated=False,
         redirect_chain=[], scope_decision={}, transport_error=None, request_hash="",
         response_hash="", success=True

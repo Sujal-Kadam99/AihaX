@@ -1,22 +1,23 @@
 """Unit tests for XssVerificationStrategy covering checks C037 through C046."""
 
-import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
+from backend.services.request_engine import RequestEngine, RequestEvidence
 from backend.services.verification_engine import (
-    VerificationContext,
     VerificationBudget,
-    VerificationStatus,
+    VerificationContext,
     VerificationReasonCode,
     VerificationRegistry,
+    VerificationStatus,
 )
-from backend.services.request_engine import RequestEngine, RequestEvidence
 from backend.services.verification_strategies.xss_strategy import (
-    XssVerificationStrategy,
-    MARKER_VARIABLE,
-    MARKER_SCRIPT,
     MARKER_HTML_RENDER,
+    MARKER_SCRIPT,
+    MARKER_VARIABLE,
+    XssVerificationStrategy,
 )
 
 

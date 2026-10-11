@@ -8,8 +8,8 @@ from backend.agents.checks.c023_sql_injection import C023SQLInjection
 from backend.core.scope_validator import ScopeValidator
 from backend.recon.endpoint_discovery import EndpointDiscoveryEngine
 from backend.recon.models import DiscoveredAsset, DiscoverySource
-from backend.services.request_engine import MockTransport, RawResponse, RequestEngine
 from backend.services.campaign_executor import CampaignRequestBudget
+from backend.services.request_engine import MockTransport, RawResponse, RequestEngine
 from backend.services.verification_engine import (
     VerificationContext,
     VerificationStatus,

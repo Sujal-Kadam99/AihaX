@@ -1,6 +1,7 @@
 """Tests for Bug Bounty Report Generation and Evidence Integrity."""
 
 import pytest
+
 from backend.models.database import Finding
 from backend.services.bug_bounty_generator import BugBountyReportGenerator
 

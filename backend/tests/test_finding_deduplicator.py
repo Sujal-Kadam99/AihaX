@@ -1,7 +1,9 @@
 """Tests for Finding Deduplication, Confidence Scoring, and Evidence Hashing."""
 
 import json
+
 import pytest
+
 from backend.models.database import Finding
 from backend.services.finding_deduplicator import (
     ConfidenceLevel,

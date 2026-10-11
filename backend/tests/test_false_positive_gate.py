@@ -4,12 +4,14 @@ Validates deterministic false-positive detection rules across transport security
 missing headers, access control contradictions, and generic error pages.
 """
 
-import pytest
-from backend.services.false_positive_gate import (
-    FalsePositiveGate,
-    FalsePositiveEvaluationResult,
-)
 from unittest import mock
+
+import pytest
+
+from backend.services.false_positive_gate import (
+    FalsePositiveEvaluationResult,
+    FalsePositiveGate,
+)
 
 
 class TestTransportSecurityFalsePositives:

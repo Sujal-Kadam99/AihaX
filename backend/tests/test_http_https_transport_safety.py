@@ -1,7 +1,8 @@
 """Tests for HTTP and HTTPS Transport Support and Security Scope Enforcement."""
 
 import pytest
-from backend.core.scope_validator import ScopeValidator, ScopeStatus
+
+from backend.core.scope_validator import ScopeStatus, ScopeValidator
 from backend.services.request_engine import (
     MockTransport,
     RawResponse,

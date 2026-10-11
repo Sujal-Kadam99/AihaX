@@ -28,6 +28,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import backend.agents.checks  # Ensure all checks are registered
 from backend.core.check_registry import registry
 from backend.core.scope_validator import (
     ScopeValidator,
@@ -43,13 +44,13 @@ from backend.models.database import (
     ProgramScope,
 )
 from backend.persistence.models import (
+    AuditTrailEvent,
     AuthorizationRecord,
     Campaign,
     CampaignSnapshot,
     CampaignTarget,
     EvidenceRecord,
     ExecutionTask,
-    AuditTrailEvent,
 )
 from backend.persistence.repository import CampaignRepository
 from backend.persistence.state_machine import (
@@ -71,9 +72,6 @@ from backend.services.request_engine import (
     RequestTimeout,
     ScopeDecision,
 )
-
-import backend.agents.checks  # Ensure all checks are registered
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Test Fixtures

@@ -1,5 +1,5 @@
-import os
 import base64
+import os
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -29,9 +29,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from backend.models.database import Base
 
 from backend.main import app
+from backend.models.database import Base
 
 
 @pytest.fixture

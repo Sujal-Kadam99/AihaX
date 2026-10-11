@@ -24,54 +24,32 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import pytest
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.core.scope_validator import ScopeValidator, validate_destination_safety
 from backend.models.database import (
-    Base,
-    AttackSurfaceNodeRecord,
     AttackSurfaceEdgeRecord,
+    AttackSurfaceNodeRecord,
+    Base,
+    Phase23AuditEventRecord,
+    Phase23ConfidenceAssessmentRecord,
+    ValidationObservationRecord,
     ValidationPlanRecord,
     ValidationPlanStepRecord,
-    ValidationObservationRecord,
     ValidationReproductionRecord,
-    Phase23ConfidenceAssessmentRecord,
-    Phase23AuditEventRecord,
     get_utc_now,
 )
 from backend.services.attack_surface_graph import (
-    AttackSurfaceGraphEngine,
-    AttackSurfaceNodeType,
-    AttackSurfaceEdgeType,
-    AttackSurfaceNodeDTO,
     AttackSurfaceEdgeDTO,
-)
-from backend.services.vulnerability_hypothesis import (
-    VulnerabilityHypothesisEngine,
-    VulnerabilityHypothesisDTO,
-    VulnerabilityClass,
-)
-from backend.services.validation_plan import (
-    ValidationPlanBuilder,
-    ValidationPlanDTO,
-    ValidationPlanStepDTO,
-)
-from backend.services.plan_safety import (
-    ValidationPlanSafetyAnalyzer,
-    ValidationPlanSafetyDecision,
-    ValidationPlanSafetyResultDTO,
-)
-from backend.services.exploit_validator import (
-    AdvancedAuthorizedValidationExecutor,
-)
-from backend.services.reproducibility import (
-    ReproducibilityEngine,
-    ReproducibilityClassification,
-    ReproducibilityResultDTO,
+    AttackSurfaceEdgeType,
+    AttackSurfaceGraphEngine,
+    AttackSurfaceNodeDTO,
+    AttackSurfaceNodeType,
 )
 from backend.services.confidence_engine import (
     ConfidenceEngine,
@@ -79,11 +57,34 @@ from backend.services.confidence_engine import (
     Phase23ConfidenceAssessmentDTO,
 )
 from backend.services.evidence_chain import (
-    Phase23EvidenceChainService,
     Phase23EvidenceChainDTO,
+    Phase23EvidenceChainService,
+)
+from backend.services.exploit_validator import (
+    AdvancedAuthorizedValidationExecutor,
+)
+from backend.services.plan_safety import (
+    ValidationPlanSafetyAnalyzer,
+    ValidationPlanSafetyDecision,
+    ValidationPlanSafetyResultDTO,
 )
 from backend.services.report_generator import generate_phase23_report_package
+from backend.services.reproducibility import (
+    ReproducibilityClassification,
+    ReproducibilityEngine,
+    ReproducibilityResultDTO,
+)
 from backend.services.request_engine import MockTransport, RequestEngine, RequestSpec
+from backend.services.validation_plan import (
+    ValidationPlanBuilder,
+    ValidationPlanDTO,
+    ValidationPlanStepDTO,
+)
+from backend.services.vulnerability_hypothesis import (
+    VulnerabilityClass,
+    VulnerabilityHypothesisDTO,
+    VulnerabilityHypothesisEngine,
+)
 
 
 @pytest.fixture
@@ -921,7 +922,6 @@ class TestPhase23ReportGenerator:
 class TestZeroNetworkIsolationGuarantees:
     @pytest.mark.asyncio
     async def test_mock_transport_intercepts_all_traffic(self):
-        from backend.core.scope_validator import ScopeValidator
         mock = MockTransport(default_status=200, default_headers={"X-Test": "Mock"}, default_body="mock_body")
         scope = ScopeValidator(in_scope_assets=["production-target.example.com"])
         engine = RequestEngine(transport=mock, scope_validator=scope, rate_limit_rps=2, max_concurrency=1)
@@ -933,7 +933,6 @@ class TestZeroNetworkIsolationGuarantees:
 
     @pytest.mark.parametrize("method", ["GET", "HEAD", "OPTIONS"])
     def test_mock_transport_dispatches_safe_methods(self, method):
-        from backend.core.scope_validator import ScopeValidator
         mock = MockTransport(default_status=204, default_body="OK")
         scope = ScopeValidator(in_scope_assets=["example.com"])
         engine = RequestEngine(transport=mock, scope_validator=scope)

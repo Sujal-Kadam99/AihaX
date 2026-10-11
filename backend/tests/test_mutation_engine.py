@@ -2,6 +2,7 @@
 
 import html
 import json
+
 import pytest
 
 from backend.execution.baseline import BaselineSnapshot
@@ -20,7 +21,7 @@ from backend.execution.parameter_model import (
     ParameterSource,
     ParameterType,
 )
-from backend.recon.models import DiscoverySource, DiscoveredEndpoint, EndpointType
+from backend.recon.models import DiscoveredEndpoint, DiscoverySource, EndpointType
 from backend.services.request_engine import RequestEvidence
 
 

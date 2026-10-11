@@ -1,16 +1,17 @@
 """Tests for Report Generation and PDF Download across Scan and Campaign entities."""
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from backend.core.auth import get_or_create_api_token
 from backend.main import app
 from backend.models.database import Base, Finding, Scan, get_db
 from backend.persistence.models import Campaign
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture

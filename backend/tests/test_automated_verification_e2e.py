@@ -16,9 +16,9 @@ Deterministic tests proving the 12 canonical verification guarantees:
 """
 
 import json
-import pytest
 from unittest.mock import patch
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 

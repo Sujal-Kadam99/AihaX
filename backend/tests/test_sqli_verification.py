@@ -1,13 +1,18 @@
-import pytest
+import time
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from backend.services.request_engine import RequestEvidence, RequestSpec
 from backend.services.verification_engine import (
     VerificationContext,
-    VerificationStatus,
     VerificationReasonCode,
+    VerificationStatus,
 )
-from backend.services.verification_strategies.sql_injection_strategy import SqlInjectionVerificationStrategy
-from backend.services.request_engine import RequestSpec, RequestEvidence
-import time
+from backend.services.verification_strategies.sql_injection_strategy import (
+    SqlInjectionVerificationStrategy,
+)
+
 
 def create_context(mock_send_func) -> VerificationContext:
     context = VerificationContext(
@@ -79,7 +84,7 @@ async def test_sqli_strategy_dynamic_content_safe():
     
     async def mock_send(spec: RequestSpec):
         counter["count"] += 1
-        dynamic_padding = "A" * (counter["count"] * 100) 
+        dynamic_padding = "A" * (counter["count"] * 100)
         
         if "id=%27" in spec.url or "id='" in spec.url or "OR" in spec.url or "%20OR%20" in spec.url:
             return mock_request_evidence(f"req-{counter['count']}", True, f'{{"user": "admin", "ad": "{dynamic_padding}"}}')

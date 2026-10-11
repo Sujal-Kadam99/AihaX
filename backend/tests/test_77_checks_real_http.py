@@ -34,7 +34,13 @@ from backend.core.check_registry import CheckCategory, Severity, registry
 from backend.core.scope_validator import ScopeValidator
 from backend.models.database import Finding
 from backend.services.bug_bounty_generator import BugBountyReportGenerator
-from backend.services.request_engine import AiohttpTransport, AuthenticationContext, RequestEngine, RequestSpec, RequestTimeout
+from backend.services.request_engine import (
+    AiohttpTransport,
+    AuthenticationContext,
+    RequestEngine,
+    RequestSpec,
+    RequestTimeout,
+)
 from backend.services.verification_engine import (
     VerificationContext,
     VerificationEngine,
@@ -42,7 +48,6 @@ from backend.services.verification_engine import (
     VerificationStatus,
 )
 from backend.tests.fixtures.security_lab.lab_server import create_security_lab_app
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PYTEST FIXTURES (REAL LOCAL HTTP SOCKET SERVER)

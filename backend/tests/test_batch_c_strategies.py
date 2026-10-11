@@ -1,17 +1,26 @@
-import pytest
 import json
 from unittest.mock import AsyncMock
-from backend.services.verification_engine import (
-    VerificationContext,
-    VerificationBudget,
-    VerificationStatus,
-    VerificationReasonCode,
-)
+
+import pytest
+
 from backend.models.database import Finding
 from backend.services.request_engine import RequestEngine, RequestEvidence
-from backend.services.verification_strategies.mass_assignment_strategy import MassAssignmentVerificationStrategy
-from backend.services.verification_strategies.parameter_tampering_strategy import ParameterTamperingVerificationStrategy
-from backend.services.verification_strategies.race_condition_strategy import RaceConditionVerificationStrategy
+from backend.services.verification_engine import (
+    VerificationBudget,
+    VerificationContext,
+    VerificationReasonCode,
+    VerificationStatus,
+)
+from backend.services.verification_strategies.mass_assignment_strategy import (
+    MassAssignmentVerificationStrategy,
+)
+from backend.services.verification_strategies.parameter_tampering_strategy import (
+    ParameterTamperingVerificationStrategy,
+)
+from backend.services.verification_strategies.race_condition_strategy import (
+    RaceConditionVerificationStrategy,
+)
+
 
 def make_evidence(request_id, response_status, response_body, success=True):
     return RequestEvidence(

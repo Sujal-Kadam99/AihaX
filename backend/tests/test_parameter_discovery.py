@@ -9,7 +9,7 @@ from backend.execution.parameter_model import (
     ParameterSource,
     ParameterType,
 )
-from backend.recon.models import DiscoverySource, DiscoveredEndpoint, EndpointType
+from backend.recon.models import DiscoveredEndpoint, DiscoverySource, EndpointType
 
 
 def test_discover_query_parameters_from_url():

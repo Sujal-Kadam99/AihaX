@@ -1,6 +1,7 @@
 """End-to-end mock integration and failure injection test suite for AihaX Phase 24."""
 
 import asyncio
+
 import pytest
 
 from backend.agents.auth_agent import AuthAgent, SharedAuthContext
@@ -17,8 +18,8 @@ from backend.services.request_engine import (
     MockTransport,
     RequestEngine,
     RequestSpec,
-    redact_headers,
     redact_body,
+    redact_headers,
 )
 from backend.services.vulnerability_execution_engine import (
     ExecutionMode,
