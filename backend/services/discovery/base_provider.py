@@ -17,7 +17,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional, Union
 
-from backend.services.discovery.normalizer import AssetType, normalize_domain, normalize_ip, normalize_url
+from backend.services.discovery.normalizer import (
+    AssetType,
+    normalize_domain,
+    normalize_ip,
+    normalize_url,
+)
 from backend.services.request_engine import RequestEngine
 
 
@@ -73,7 +78,7 @@ class DiscoveredItem:
 
 def generate_passive_evidence_id(source_code: str, domain: str, raw_item: str) -> str:
     """Generate a deterministic evidence ID for passive discovery provenance."""
-    digest = hashlib.sha256(f"{source_code}:{domain}:{raw_item}".encode("utf-8")).hexdigest()[:8].upper()
+    digest = hashlib.sha256(f"{source_code}:{domain}:{raw_item}".encode()).hexdigest()[:8].upper()
     return f"EVD-PASSIVE-{digest}"
 
 
